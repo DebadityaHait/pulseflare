@@ -1,0 +1,24 @@
+name = "pulseflare-api"
+main = "src/index.ts"
+compatibility_date = "2026-05-06"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pulseflare"
+database_id = "8c45da35-ca25-449d-b336-3fe2f96efb49"
+migrations_dir = "../../migrations"
+
+[[kv_namespaces]]
+binding = "STATUS_KV"
+id = "b5a81e5554bd4386b77f018c6d34a972"
+
+[vars]
+ALLOWED_ORIGIN = "https://pulseflare.pages.dev"
+
+[[queues.producers]]
+binding = "ALERT_QUEUE"
+queue = "alert-events"
+
+[[r2_buckets]]
+binding = "ARCHIVE_BUCKET"
+bucket_name = "pulseflare-archive"

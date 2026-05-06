@@ -1,0 +1,32 @@
+{
+  "name": "pulseflare",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "build": "pnpm --filter frontend build",
+    "deploy": "pnpm -r --if-present deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260506.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.4.1",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.1.2",
+    "wrangler": "^4.14.4"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.5.0",
+    "hono": "^4.7.9",
+    "lucide-react": "^0.511.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.5.3",
+    "recharts": "^2.15.3",
+    "zod": "^3.24.4"
+  }
+}

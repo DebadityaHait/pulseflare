@@ -1,0 +1,20 @@
+name = "pulseflare-ai"
+main = "src/index.ts"
+compatibility_date = "2026-05-06"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pulseflare"
+database_id = "8c45da35-ca25-449d-b336-3fe2f96efb49"
+
+[[queues.consumers]]
+queue = "incident-events"
+max_batch_size = 10
+max_batch_timeout = 30
+
+[[queues.producers]]
+binding = "ALERT_QUEUE"
+queue = "alert-events"
+
+[ai]
+binding = "AI"

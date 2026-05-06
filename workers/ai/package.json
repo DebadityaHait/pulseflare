@@ -1,0 +1,12 @@
+{
+  "name": "@pulseflare/ai",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "deploy": "wrangler deploy -c wrangler.toml"
+  },
+  "dependencies": {
+    "@pulseflare/shared": "workspace:*"
+  }
+}
