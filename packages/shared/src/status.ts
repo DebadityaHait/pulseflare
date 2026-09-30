@@ -6,13 +6,23 @@ export function deriveState(input: { ok: boolean; latencyMs: number; baselineMea
   return "up";
 }
 
+export function derivePerformanceState(input: { ok: boolean; latencyThresholdMs?: number | null; consecutiveViolations: number; currentState?: MonitorState }): MonitorState {
+  if (!input.ok) return "down";
+  if (input.latencyThresholdMs && input.consecutiveViolations >= 2) return "degraded";
+  return input.currentState === "degraded" ? "up" : "up";
+}
+
+export function nextConfirmedState(input: { ok: boolean; latencyThresholdMs?: number | null; consecutiveLatencyViolations: number }): MonitorState {
+  return derivePerformanceState({ ok: input.ok, latencyThresholdMs: input.latencyThresholdMs, consecutiveViolations: input.consecutiveLatencyViolations });
+}
+
 export function shouldCreateIncident(previous: MonitorState | null, next: MonitorState): boolean {
   const from = previous ?? "unknown";
   return next === "down" && from !== "down";
 }
 
 export function shouldResolveIncident(previous: MonitorState | null, next: MonitorState): boolean {
-  return previous === "down" && next === "up";
+  return (previous === "down" || previous === "degraded") && (next === "up" || next === "maintenance");
 }
 
 export function uptimePercent(checks: Pick<Check, "ok">[]): number {

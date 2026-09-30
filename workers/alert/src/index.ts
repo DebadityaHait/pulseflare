@@ -1,4 +1,4 @@
-import type { AlertQueueEvent } from "@pulseflare/shared";
+import { isValidMonitorUrl, type AlertQueueEvent } from "@pulseflare/shared";
 
 export interface Env {
   DB: D1Database;
@@ -23,9 +23,11 @@ async function logDecision(env: Env, input: {
   deliveryError?: string;
 }) {
   await env.DB.prepare(
-    `INSERT INTO alert_log (incident_id, anomaly_id, monitor_id, channel, severity, route_decision, routed, delivery_status, delivery_error, sent_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO alert_log (workspace_id, event_id, incident_id, anomaly_id, monitor_id, channel, severity, route_decision, routed, delivery_status, delivery_error, sent_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
+    input.event.workspaceId,
+    input.event.eventId,
     input.event.incidentId ?? null,
     input.event.anomalyId ?? null,
     input.event.monitorId,
@@ -40,14 +42,20 @@ async function logDecision(env: Env, input: {
 }
 
 async function postJson(url: string, body: unknown): Promise<string | null> {
-  const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  return response.ok ? null : `${response.status} ${await response.text()}`;
+  if (!isValidMonitorUrl(url) || !url.startsWith("https://")) return "Blocked webhook target";
+  const response = await fetch(url, { method: "POST", redirect: "error", signal: AbortSignal.timeout(10000), headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  await response.body?.cancel();
+  return response.ok ? null : `HTTP ${response.status}`;
 }
 
 async function routeAlert(env: Env, event: AlertQueueEvent) {
-  const monitor = await env.DB.prepare(`SELECT id, name, notify_discord_webhook, notify_telegram_chat_id, notify_generic_webhook FROM monitors WHERE id = ?`).bind(event.monitorId).first<MonitorAlertRow>();
-  const suppressed = event.severity <= 1;
-  const dashboardOnly = event.severity <= 3;
+  if (!event.workspaceId || !event.eventId) throw new Error("Queue event is missing tenant context");
+  const monitor = await env.DB.prepare(`SELECT id, name, notify_discord_webhook, notify_telegram_chat_id, notify_generic_webhook FROM monitors WHERE id = ? AND workspace_id = ?`).bind(event.monitorId, event.workspaceId).first<MonitorAlertRow>();
+  if (!monitor) return;
+  // Recovery notifications must not disappear just because recovery lowers severity.
+  const recovery = event.eventType === "incident.resolved";
+  const suppressed = !recovery && event.severity <= 1;
+  const dashboardOnly = !recovery && event.severity <= 3;
   const message = `Pulseflare alert for ${monitor?.name ?? event.monitorId}\nSeverity: ${event.severity}\n${event.summary}`;
 
   if (suppressed || dashboardOnly) {
@@ -55,7 +63,7 @@ async function routeAlert(env: Env, event: AlertQueueEvent) {
     return;
   }
 
-  const discord = monitor?.notify_discord_webhook ?? env.DISCORD_DEFAULT_WEBHOOK;
+  const discord = monitor.notify_discord_webhook ?? (event.workspaceId === "legacy" ? env.DISCORD_DEFAULT_WEBHOOK : undefined);
   if (discord) {
     const error = await postJson(discord, { content: message });
     await logDecision(env, { event, channel: "discord", routeDecision: "immediate", routed: true, deliveryStatus: error ? "failed" : "sent", deliveryError: error ?? undefined });

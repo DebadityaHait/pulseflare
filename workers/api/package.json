@@ -7,6 +7,7 @@
     "deploy": "wrangler deploy -c wrangler.toml"
   },
   "dependencies": {
+    "@clerk/backend": "^3.16.4",
     "@pulseflare/shared": "workspace:*",
     "hono": "^4.7.9",
     "zod": "^3.24.4"

@@ -18,7 +18,7 @@ describe("buildIncidentPrompt", () => {
         tags: [],
         notifyDiscordWebhook: "https://discord.com/api/webhooks/secret",
         createdAt: "now",
-        updatedAt: "now"
+        updatedAt: "now",
       },
       incident: {
         id: "i1",
@@ -28,9 +28,18 @@ describe("buildIncidentPrompt", () => {
         startedAt: "2026-05-06T10:00:00Z",
         aiSummaryStatus: "pending",
         createdAt: "now",
-        updatedAt: "now"
+        updatedAt: "now",
       },
-      checks: [{ id: 1, monitorId: "m1", status: 503, ok: false, latencyMs: 50, checkedAt: "2026-05-06T10:00:00Z" }]
+      checks: [
+        {
+          id: 1,
+          monitorId: "m1",
+          status: 503,
+          ok: false,
+          latencyMs: 50,
+          checkedAt: "2026-05-06T10:00:00Z",
+        },
+      ],
     });
     expect(prompt).toContain("status=503");
     expect(prompt).toContain("/health");

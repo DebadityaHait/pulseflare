@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applySeverityOverrides, fallbackSeverity, parseSeverity } from "@pulseflare/shared";
+import {
+  applySeverityOverrides,
+  fallbackSeverity,
+  parseSeverity,
+} from "@pulseflare/shared";
 
 describe("severity", () => {
   it("parses severity integers", () => {
@@ -13,10 +17,24 @@ describe("severity", () => {
   });
 
   it("falls back for long outages", () => {
-    expect(fallbackSeverity({ isOpen: true, durationMinutes: 31, failureRateLast5: 0.2, publicMonitor: true })).toBe(5);
+    expect(
+      fallbackSeverity({
+        isOpen: true,
+        durationMinutes: 31,
+        failureRateLast5: 0.2,
+        publicMonitor: true,
+      }),
+    ).toBe(5);
   });
 
   it("overrides low AI score upward", () => {
-    expect(applySeverityOverrides(1, { isOpen: true, durationMinutes: 12, failureRateLast5: 1, publicMonitor: true })).toBe(4);
+    expect(
+      applySeverityOverrides(1, {
+        isOpen: true,
+        durationMinutes: 12,
+        failureRateLast5: 1,
+        publicMonitor: true,
+      }),
+    ).toBe(4);
   });
 });

@@ -6,3 +6,7 @@ dist
 .admin-token.local
 *.local
 coverage
+.playwright-cli/
+artifacts/
+test-results/
+playwright-report/

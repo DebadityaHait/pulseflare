@@ -7,6 +7,21 @@ Pulseflare is a serverless monitoring system that checks HTTP services, detects 
 **Live demo:** https://pulseflare.pages.dev  
 **API:** https://pulseflare-api.opener.workers.dev
 
+## Presentation-first release (local, not deployed)
+
+The new site has an animated graphite/orange homepage, original optimized artwork, interactive product previews, pricing with coming-soon dialogs, architecture and documentation pages, and a responsive light/dark workspace. `/demo` is a populated, read-only Orbit workspace. Its services, metrics, delivery records, and incident evidence are explicitly fictional; it makes no API requests or notifications. Incident reports can be exported as Markdown.
+
+```bash
+pnpm install
+pnpm --filter frontend dev
+```
+
+Open `http://localhost:5173` for the website or `/demo` for the workspace. No credentials are needed. Leave `VITE_CLERK_PUBLISHABLE_KEY` unset for the portfolio deployment: login/signup then present a polished coming-soon page. For connected development, set the frontend `VITE_*` variables from `.env.example` in `frontend/.env.local`, and configure the corresponding API secrets and authorized origins separately.
+
+The v2 API uses Clerk organization sessions or scoped API keys, not the retired browser-stored admin token. Basic HTTP monitor creation, listing, checks, pause/resume, incident updates, and workspace API-key management have connected UI paths. Authentication against a real Clerk tenant has not been end-to-end verified in this release.
+
+See [release notes and launch gates](docs/PRESENTATION_RELEASE.md) before deploying workers or enabling public enrollment. The original live URLs above have not been updated by this implementation.
+
 ## Why It Matters
 
 Most uptime monitors tell you that something failed. Pulseflare adds operational context:
@@ -27,7 +42,7 @@ The AI layer is intentionally asynchronous and guarded by deterministic fallback
 - **Noise-aware alerting:** severity-based routing with Discord, Telegram, and generic webhook support.
 - **Fast public status reads:** latest monitor state cached in KV, durable history stored in D1.
 - **Typed full-stack implementation:** strict TypeScript across shared logic, Workers, tests, and React frontend.
-- **Modern dashboard:** dark-mode glass UI with public status, admin dashboard, monitor details, incident summaries, and archive controls.
+- **Product showcase:** responsive homepage, theme-aware workspace, public demo, incident exports, integrations preview, usage, status pages, and honest coming-soon plans.
 
 ## Architecture
 
@@ -50,7 +65,7 @@ flowchart LR
 
 Pulseflare separates the critical monitoring path from slower AI and notification work.
 
-- The checker Worker runs on a one-minute cron, performs HTTP checks with timeouts, writes raw check results to D1, and updates KV with the latest status.
+- The checker Worker wakes on a one-minute cron but respects each HTTP monitor's interval (minimum five minutes), performs checks with timeouts, writes workspace-scoped evidence to D1, and updates KV. It does not expose a public run-check endpoint.
 - State transitions create queue messages instead of blocking the checker.
 - The AI Worker consumes incident and anomaly events, calls Workers AI, validates model output, and stores summaries/severity in D1.
 - The alert Worker consumes routed alert events and logs every delivery decision.
@@ -101,9 +116,10 @@ Current checks:
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm test:browser
 ```
 
-The test suite covers core non-Cloudflare logic including anomaly detection, state transitions, URL validation, prompt construction, and severity fallback behavior.
+The tests cover shared monitoring logic, secret encryption, unsafe URL variants, demo evidence consistency, API-key scopes, workspace boundaries, and migrations against an existing SQLite database. The browser smoke suite requires Chrome and the frontend dev server on port 5173; it checks 24 routes at three widths, pricing dialogs, filters, read-only behavior, exports, themes, and console errors. Node 22.13+ is required for the SQLite-backed API tests (verified with Node 24).
 
 ## Resume Talking Points
 
@@ -115,4 +131,4 @@ The test suite covers core non-Cloudflare logic including anomaly detection, sta
 
 ## Notes
 
-This is a portfolio project, not a commercial SLA product. v1 focuses on HTTP/HTTPS monitoring, incident intelligence, and alert routing. Future extensions could include multi-user auth, SSL expiry checks, DNS checks, maintenance windows, regional validation, and custom status-page domains.
+This is a portfolio project, not a commercial SLA product. The complete v2 PRD is not implemented. Durable Object scheduling, robust retry/idempotency, automated retention, production onboarding, encrypted multi-channel delivery, and other launch gates are documented separately. Pricing does not accept payments, and no customer counts or endorsements are fabricated.

@@ -7,11 +7,17 @@ describe("detectLatencyAnomaly", () => {
   });
 
   it("does not flag normal latency", () => {
-    expect(detectLatencyAnomaly([100, 105, 98, 102, 101, 99, 103, 104, 97, 100], 106).anomalous).toBe(false);
+    expect(
+      detectLatencyAnomaly([100, 105, 98, 102, 101, 99, 103, 104, 97, 100], 106)
+        .anomalous,
+    ).toBe(false);
   });
 
   it("flags high z-score latency", () => {
-    expect(detectLatencyAnomaly([100, 105, 98, 102, 101, 99, 103, 104, 97, 100], 250).anomalous).toBe(true);
+    expect(
+      detectLatencyAnomaly([100, 105, 98, 102, 101, 99, 103, 104, 97, 100], 250)
+        .anomalous,
+    ).toBe(true);
   });
 
   it("handles zero stddev", () => {

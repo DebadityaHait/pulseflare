@@ -6,11 +6,13 @@
   "scripts": {
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
+    "test:browser": "node scripts/run-browser-smoke.mjs",
     "build": "pnpm --filter frontend build",
     "deploy": "pnpm -r --if-present deploy"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260506.0",
+    "@playwright/test": "^1.63.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.4.1",

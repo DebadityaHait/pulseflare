@@ -4,3 +4,5 @@ export * from "./status";
 export * from "./anomaly";
 export * from "./severity";
 export * from "./prompts";
+export * from "./entitlements";
+export * from "./security";

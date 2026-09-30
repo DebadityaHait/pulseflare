@@ -32,6 +32,39 @@ export function buildSeverityPrompt(summary: string): string {
   return `Classify incident severity as a single integer from 1 to 5. 1 means suppress, 5 means urgent. Return only the integer.\n${summary}`;
 }
 
+export function buildIncidentIntelligencePrompt(input: { monitor: Monitor; incident: Incident; checks: Check[] }): string {
+  const evidence = input.checks
+    .slice(0, 12)
+    .map((check) => `${check.checkedAt}: status=${check.status}, ok=${check.ok}, latency=${check.latencyMs}ms, error=${check.errorCode ?? "none"}`)
+    .join("\n");
+  return `You are an uptime incident assistant. Return ONLY valid JSON with this exact shape: {"summary":"string","probable_causes":["string"],"recommended_actions":["string"],"model_severity":1,"confidence":0.0}. model_severity must be an integer from 1 to 5 and confidence must be between 0 and 1. Never include secrets or full URLs.\nMonitor: ${input.monitor.name}\nPath: ${new URL(input.monitor.url).pathname || "/"}\nIncident status: ${input.incident.status}\nStarted: ${input.incident.startedAt}\nResolved: ${input.incident.resolvedAt ?? "not resolved"}\nRecent evidence:\n${evidence}`;
+}
+
+export interface IncidentIntelligence {
+  summary: string;
+  probableCauses: string[];
+  recommendedActions: string[];
+  modelSeverity: number;
+  confidence: number;
+}
+
+export function parseIncidentIntelligence(output: string | null | undefined): IncidentIntelligence | null {
+  if (!output) return null;
+  try {
+    const cleaned = output.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+    const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+    const summary = typeof parsed.summary === "string" ? parsed.summary.trim() : "";
+    const probableCauses = Array.isArray(parsed.probable_causes) ? parsed.probable_causes.filter((value): value is string => typeof value === "string").slice(0, 5) : [];
+    const recommendedActions = Array.isArray(parsed.recommended_actions) ? parsed.recommended_actions.filter((value): value is string => typeof value === "string").slice(0, 5) : [];
+    const modelSeverity = typeof parsed.model_severity === "number" ? Math.round(parsed.model_severity) : Number(parsed.model_severity);
+    const confidence = typeof parsed.confidence === "number" ? parsed.confidence : Number(parsed.confidence);
+    if (!summary || !Number.isFinite(modelSeverity) || modelSeverity < 1 || modelSeverity > 5 || !Number.isFinite(confidence) || confidence < 0 || confidence > 1) return null;
+    return { summary, probableCauses, recommendedActions, modelSeverity, confidence };
+  } catch {
+    return null;
+  }
+}
+
 export function buildAnomalyPrompt(input: { monitor: Monitor; latencyMs: number; mean: number; stddev: number; zScore: number }): string {
   return `Explain this latency anomaly in 1-2 sentences for an on-call developer.
 Monitor: ${input.monitor.name}
