@@ -1,136 +1,169 @@
 # Pulseflare
 
-AI-enhanced uptime monitoring on Cloudflare Workers.
+Multi-tenant uptime monitoring, built on Cloudflare's edge.
 
-Pulseflare is a serverless monitoring system that checks HTTP services, detects outages and latency anomalies, summarizes incidents with Workers AI, scores severity, and routes alerts through async queues. It is built as a portfolio-grade full-stack project to demonstrate edge compute, durable storage, queues, AI integration, and a polished operational dashboard.
+Monitor websites, APIs, and background jobs. Investigate incidents, receive alerts, and publish service health from one workspace. A working beta built with **Workers, D1, Queues, Cron Triggers, Workers AI, and Pages**; no traditional application server or external database.
 
-**Live app:** https://pulseflare.zlv.uk
+[Live application](https://pulseflare.zlv.uk) · [Explore the demo](https://pulseflare.zlv.uk/demo) · [Public status preview](https://pulseflare.zlv.uk/status/demo) · [Architecture deep dive](docs/ARCHITECTURE.md)
 
-**Read-only demo:** https://pulseflare.zlv.uk/demo
+[![Pulseflare homepage with its interactive monitoring preview](docs/screenshots/homepage.png)](https://pulseflare.zlv.uk)
 
-**API:** https://pulseflare.zlv.uk/api
+## Try it in a minute
 
-## Functional Beta MVP
+1. Open the [read-only workspace](https://pulseflare.zlv.uk/demo). No account required.
+2. Inspect a [monitor's latency and availability](https://pulseflare.zlv.uk/demo/monitors/website), then an [incident's evidence and timeline](https://pulseflare.zlv.uk/demo/incidents/inc-search).
+3. Visit the [public status page](https://pulseflare.zlv.uk/status/demo), or switch themes and try the mobile layout.
+4. To use actual monitoring, [create an account](https://pulseflare.zlv.uk/signup), create a workspace, and add an HTTP or heartbeat monitor.
 
-The website has an animated graphite/orange homepage with an interactive monitoring preview, themed Clerk signup, pricing with coming-soon paid plans, architecture/docs pages, and a responsive light/dark workspace. Signup opens real monitoring. `/demo` is a separate read-only Orbit workspace with explicitly fictional data and no API mutations.
+The demo's **Orbit** services, metrics, incidents, and reports are explicitly fictional. Signed-in workspaces use real Workers/D1 data. The current deployment intentionally uses development-mode Clerk; paid plans show a coming-soon notice and do not collect payments.
 
-```bash
-pnpm install
-pnpm --filter frontend dev
-```
+## What works today
 
-Open `http://localhost:5173`. Demo routes require no credentials. Real accounts use the development Clerk keys in the root `.env`; Vite exposes only the publishable key. Organizations must be enabled. Run `node scripts/configure-clerk.mjs` once to enable them on the development instance. Configure API Worker secrets separately; never place secrets in `VITE_*` variables.
+| Capability | Implemented in the beta |
+| --- | --- |
+| HTTP monitoring | GET/HEAD/POST, five-minute minimum intervals, timeouts, status ranges, required/forbidden text, JSON-path assertions, encrypted request headers |
+| Background-job heartbeats | Secret GET/POST ping URLs, expected intervals, grace periods, missed-run incidents, automatic recovery, secret rotation, pause/resume |
+| Incident investigation | Two-failure outage confirmation, latency thresholds and anomaly detection, check evidence, timelines, acknowledgement, resolution, explicit public updates |
+| Notifications | Slack, Discord, Telegram, HTTPS webhooks, encrypted integration settings, test delivery, delivery records, retries, optional webhook HMAC signatures |
+| AI assistance | Workers AI summaries and advisory severity, validated output, deterministic fallback, ten enrichment events per workspace per day; alerts never wait for AI |
+| Public status pages | Selected public monitors, availability history, published incident updates, edge-cached snapshots; private investigation stays private |
+| Multi-tenant access | Clerk authentication and organizations, Admin/Member access, workspace-scoped queries, scoped/revocable API keys, audit events |
+| Product experience | Responsive light/dark workspace, latency charts, searchable/filterable monitors, visible beta quotas, animated product-led homepage |
 
-The API uses Clerk organization sessions or scoped API keys. HTTP checks, assertions, encrypted headers, heartbeat deadlines/recovery/rotation, incident updates, encrypted notification integrations, delivery logs, public-page selection, and API keys are connected to real Workers/D1 data. Alerts dispatch independently of optional, quota-limited AI enrichment.
-
-See [MVP runtime and release checks](docs/MVP_RELEASE.md), [free-tier safeguards](docs/FREE_TIER_OPERATIONS.md), and the [deferred feature backlog](TODO.md). The frontend uses `pulseflare.zlv.uk` in the second Cloudflare account; a Pages service binding proxies `/api/*` to the API Worker. The active scheduler is a minute cron with atomic D1 leases. Durable Objects, archives/rollups, billing, and other advanced additions are deferred.
-
-## Why It Matters
-
-Most uptime monitors tell you that something failed. Pulseflare adds operational context:
-
-- what failed,
-- when it started,
-- whether the incident is still open,
-- how serious it is,
-- what evidence supports the summary,
-- and whether an alert should be routed immediately.
-
-The AI layer is intentionally asynchronous and guarded by deterministic fallbacks, so monitoring stays reliable even if model output is slow or malformed.
-
-## Highlights
-
-- **Cloudflare-native MVP:** Workers, Cron Triggers, D1, Queues, Workers AI, and Pages. KV snapshots and R2 archival are deferred.
-- **AI incident intelligence:** incident summaries, anomaly explanations, and severity scoring via Workers AI.
-- **Noise-aware alerting:** severity-based routing with Discord, Telegram, and generic webhook support.
-- **Fast public status reads:** selected public monitor state cached for two minutes at the edge, indexed evidence stored in D1.
-- **Typed full-stack implementation:** strict TypeScript across shared logic, Workers, tests, and React frontend.
-- **Product showcase:** responsive homepage, theme-aware workspace, public demo, incident exports, integrations preview, usage, status pages, and honest coming-soon plans.
+Beta capacity is deliberately bounded: **five active monitors per workspace, ten across this deployment, one status page per workspace, and seven days of raw check history**. Capacity is a guardrail, not a claim of commercial scale.
 
 ## Architecture
 
 ```mermaid
-flowchart LR
-  Pages[React + Cloudflare Pages] --> API[API Worker]
-  Cron[Cloudflare Cron] --> Checker[Checker Worker]
-  Checker --> D1[(D1)]
-  Checker --> Outbox[D1 transactional outbox]
-  Outbox --> IQ[Incident Queue]
-  Outbox --> AQ[Alert Queue]
-  IQ --> AI[AI Worker]
-  AI --> WAI[Workers AI]
-  AQ --> Alert[Alert Worker]
-  Alert --> D1
+flowchart TB
+  Browser["Browser / React workspace"] --> Pages["Cloudflare Pages"]
+  Pages -->|"static assets"| Static["Marketing site + read-only demo"]
+  Pages -->|"/api service binding"| API["Hono API Worker"]
+  Clerk["Clerk sessions + organizations"] -.-> API
+  Jobs["Background jobs"] -->|"secret heartbeat URL"| API
+  API --> D1[("D1: tenants, monitors, evidence, incidents")]
+  Cron["Minute Cron Trigger"] --> Checker["Checker Worker / atomic D1 leases"]
+  Checker -->|"bounded HTTP probes"| Endpoints["Websites + APIs"]
+  Checker -->|"checks + transitions"| D1
+  D1 --- Outbox["Transactional outbox"]
+  Outbox --> AQ["Alert queue"]
+  Outbox --> IQ["Incident queue"]
+  AQ --> Alert["Alert Worker"]
+  Alert --> Providers["Slack / Discord / Telegram / webhooks"]
+  IQ --> AI["AI Worker"]
+  AI --> WAI["Workers AI"]
+  AI -->|"optional enrichment"| D1
+  Alert -->|"delivery records"| D1
+  API --- Cache["Cache API / public snapshots"]
 ```
 
-## System Design
+The diagram shows the **deployed MVP**, not the entire v2 design. Durable Object scheduling, R2 archives, and historical rollups are roadmap items.
 
-Pulseflare separates the critical monitoring path from slower AI and notification work.
+### Engineering decisions worth a closer look
 
-- The checker Worker wakes on a one-minute cron, claims due HTTP checks with D1 leases, confirms outages after two failures, and detects missed heartbeat deadlines. It writes workspace-scoped evidence and transactional outbox events to D1.
-- State transitions create queue messages instead of blocking the checker.
-- The AI Worker consumes incident and anomaly events, calls Workers AI, validates model output, and stores summaries/severity in D1.
-- The alert Worker consumes routed alert events and logs every delivery decision.
-- The API Worker powers the dashboard and public status page without exposing secrets.
+- **Persist before dispatch.** Check evidence, incident transitions, and outbox events are committed together. Independent queue handoffs keep an AI failure from blocking notifications. See [shared monitoring logic](packages/shared/src/monitoring.ts).
+- **Claim work atomically.** The minute scheduler uses D1 leases to prevent overlapping HTTP checks. Heartbeat deadlines are checked independently of outbound probes. See the [checker](workers/checker/src/index.ts).
+- **Treat delivery as at-least-once.** Recorded successes suppress duplicate queue messages; webhooks carry event IDs and idempotency headers. A lost provider response can still cause a repeat delivery. See the [alert consumer](workers/alert/src/index.ts).
+- **Keep public reads cheap.** Cached public responses bypass D1 entirely, including the budget ledger. Private AI notes never enter the public snapshot. See the [API](workers/api/src/index.ts).
+- **Budget rows, not requests.** Indexed history queries, bounded anomaly windows, incremental cleanup, atomic monitor caps, and a shared daily cost ledger protect the small deployment. See [budget enforcement](packages/shared/src/budget.ts) and [operating notes](docs/FREE_TIER_OPERATIONS.md).
+- **Test security boundaries.** Workspace isolation, deny-default API-key scopes, revocation, secret encryption, unsafe URL variants, and migration compatibility have regression coverage. See [API tests](tests/api.test.ts), [security tests](tests/security.test.ts), and [MVP tests](tests/mvp.test.ts).
 
-## AI Implementation
+The project pauses new database work at **3 million reads / 60,000 writes per UTC day**. This is a conservative Worker-side guard, not an exact account-wide billing cap: concurrent work, migrations, and other applications require separate accounting. HTTP redirects are disabled and private literal addresses/internal names are rejected; DNS-aware rebinding protection remains a documented launch gate.
 
-Workers AI is used for:
+## Product tour
 
-- incident summaries,
-- anomaly explanations,
-- severity scoring.
+These are unretouched screenshots captured from the live deployment. Workspace screenshots use the labeled fictional demo; its extended history and postmortem preview do not imply those features are available in live workspaces.
 
-The default model is:
+### Workspace overview
 
-```text
-@cf/meta/llama-3.1-8b-instruct
-```
+Service health, monitor history, active incidents, and response-time trends in a single view.
 
-AI output is never trusted blindly. Severity is parsed as an integer from 1 to 5, summaries fall back to deterministic templates, and routing rules can override low AI scores for clearly serious incidents.
+![Dark-theme workspace overview with HTTP and heartbeat monitors](docs/screenshots/workspace.png)
 
-## Tech Stack
+<details>
+<summary>More screenshots: monitor analytics, incident investigation, public status, and mobile</summary>
 
-- **Frontend:** React, Vite, TypeScript, Recharts, lucide-react
-- **Backend:** Cloudflare Workers, Hono, TypeScript
-- **Data:** D1, KV, R2
-- **Async:** Cloudflare Queues
-- **AI:** Cloudflare Workers AI
-- **Testing:** Vitest
+#### Monitor analytics · light theme
 
-## Project Structure
+![Monitor detail showing a latency chart, availability history, and recent checks](docs/screenshots/monitor.png)
 
-```text
-packages/shared        Shared types, validation, status logic, anomaly detection, AI fallbacks
-workers/checker        Scheduled uptime checks and incident/anomaly event creation
-workers/api            REST API for dashboard, public status, settings, and archive trigger
-workers/ai             Queue consumer for Workers AI summaries and severity scoring
-workers/alert          Queue consumer for alert routing and delivery logs
-frontend               React dashboard and public status page
-migrations             D1 schema and seed data
-```
+#### Incident investigation · dark theme
+
+![Incident detail showing a sample AI summary and evidence timeline](docs/screenshots/incident.png)
+
+#### Customer-facing status page
+
+![Public status page showing selected services and published incident updates](docs/screenshots/status-page.png)
+
+#### Mobile workspace
+
+<img src="docs/screenshots/mobile.png" alt="Responsive workspace at a 390-pixel mobile viewport" width="320" />
+
+</details>
 
 ## Verification
 
-Current checks:
+Verified for the current deployment on **September 30, 2026**:
+
+- **73 tests across 10 files**, including SQLite-backed API/migration tests and a 10,000-old-check indexed-query regression fixture.
+- All **six packages** typechecked; frontend production build and all four Worker deployment dry runs passed.
+- **72 deployed route/viewport checks**: 24 routes at 1440, 390, and 360 px, plus pricing dialogs, filters, themes, mobile navigation, read-only behavior, and demo Markdown export.
+- Authenticated end-to-end checks: email/password signup and verification, workspace creation, HTTP checks, heartbeat ping and cron-detected missed-run recovery, public-page publication, API-key use and revocation.
+- Google OAuth handoff verified; the automated test did not complete Google account consent. Optional Cloudflare analytics DNS warnings are reported separately from application errors.
+
+Test identities and monitoring resources are removed after verification, not presented as customers. See the [release record](docs/MVP_RELEASE.md) and [authenticated smoke scenario](scripts/authenticated-smoke.mjs).
+
+## Run locally
+
+Use **Node 24** and **pnpm 10**. SQLite-backed tests require Node 22.13 or newer.
+
+```bash
+git clone https://github.com/DebadityaHait/pulseflare.git
+cd pulseflare
+pnpm install
+pnpm --filter frontend dev
+```
+
+Open `http://localhost:5173/demo`. The marketing site and demo work without credentials or a database.
+
+For real local accounts, copy [.env.example](.env.example) to the root `.env`, provide your Clerk publishable key, and enable organizations plus email/password and Google sign-in in your development instance. Configure the API's Clerk secret and encryption key separately in ignored `workers/api/.dev.vars`. **Never put secrets in `VITE_*` variables.**
+
+Apply local migrations and start the API in a second terminal:
+
+```bash
+pnpm exec wrangler d1 migrations apply pulseflare --local --config workers/api/wrangler.toml
+pnpm exec wrangler dev --config workers/api/wrangler.toml --port 8787
+```
+
+Vite proxies `/api` to port 8787. Full scheduled monitoring, queue consumers, and AI need their respective Worker bindings; running the frontend alone does not run the monitoring pipeline. See [runtime and credential setup](docs/MVP_RELEASE.md).
 
 ```bash
 pnpm typecheck
 pnpm test
-pnpm build
-pnpm test:browser
+pnpm --filter frontend build
+pnpm test:browser                         # Chrome + frontend dev server
+node scripts/run-browser-smoke.mjs https://pulseflare.zlv.uk
 ```
 
-The tests cover shared monitoring logic, secret encryption, unsafe URL variants, demo evidence consistency, API-key scopes, workspace boundaries, and migrations against an existing SQLite database. The browser smoke suite requires Chrome and the frontend dev server on port 5173; it checks 24 routes at three widths, pricing dialogs, filters, read-only behavior, exports, themes, and console errors. Node 22.13+ is required for the SQLite-backed API tests (verified with Node 24).
+Deployment configs intentionally contain the current account/resource IDs. **Replace them with your own before deploying a fork.** Provision D1 and both queues, configure secrets and consumers, apply migrations, deploy the Workers, then publish Pages with its API service binding. Do not apply seed data to a populated database.
 
-## Resume Talking Points
+## Source map
 
-- Designed a production-style serverless monitoring pipeline across multiple Cloudflare primitives.
-- Used queues to isolate latency-sensitive health checks from AI processing and notification delivery.
-- Implemented safe AI integration with validation, deterministic fallbacks, and severity override rules.
-- Built a typed React dashboard and public status page backed by REST APIs and KV/D1 data flows.
-- Deployed a complete full-stack system without a traditional server, container, or external database.
+```text
+frontend/             React/Vite UI, Clerk integration, live workspace, public demo
+workers/api/          Hono API, authorization, heartbeat intake, public status/cache
+workers/checker/      Cron scheduling, D1 leases, HTTP probes, deadlines, retention
+workers/alert/        Notification adapters, delivery records, retry/idempotency
+workers/ai/           Workers AI enrichment, output validation, quotas, fallbacks
+packages/shared/      Monitoring transitions, outbox, security, budgets, validation
+migrations/           Tenant schema, MVP state, indexes, atomic capacity triggers
+tests/                Vitest + SQLite-backed integration/regression tests
+scripts/              Browser verification, auth smoke tests, screenshot capture
+docs/                 Architecture, operating limits, release records, screenshots
+```
 
-## Notes
+## Scope and roadmap
 
-This is a portfolio project, not a commercial SLA product. The complete v2 PRD is not implemented. Durable Object scheduling, robust retry/idempotency, automated retention, production onboarding, encrypted multi-channel delivery, and other launch gates are documented separately. Pricing does not accept payments, and no customer counts or endorsements are fabricated.
+This is an operating beta, not a commercial SLA service. Monitoring and notification delivery are implemented; maintenance suppression, production Clerk, DNS-aware SSRF protection, dead-letter operator tools, longer history/R2 archival, SLOs, live postmortems, CLI/config-as-code, deployment annotations, push subscriptions, status widgets, and billing are deferred.
+
+The [backlog](TODO.md) records dependencies and completion criteria. The [architecture notes](docs/ARCHITECTURE.md) explain the failure model and tradeoffs behind this release.
