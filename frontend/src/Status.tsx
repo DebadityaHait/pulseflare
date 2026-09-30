@@ -6,14 +6,14 @@ import {
   Check,
   Globe,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "./api/client";
 import { demoMonitors } from "./data/demo";
 import { UptimeBar } from "./components/telemetry";
 import { Brand, ThemeToggle, useNotice } from "./components/ui";
 type Snapshot = {
-  page: { title: string; description: string };
+  page: { title: string; description: string; brandColor?: string };
   overallState: string;
   monitors: Array<{
     id: string;
@@ -28,16 +28,27 @@ type Snapshot = {
     ai_summary?: string;
   }>;
 };
+type PublicIncident = {
+  id: string;
+  monitor_name: string;
+  status: string;
+  started_at: string;
+  resolved_at: string | null;
+  message: string | null;
+};
 export default function Status() {
   const { slug = "legacy" } = useParams();
   const demo = slug === "demo";
   const notice = useNotice();
   const [error, setError] = useState("");
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [history, setHistory] = useState<PublicIncident[]>([]);
   useEffect(() => {
     const controller = new AbortController();
     setError("");
     setSnapshot(null);
+    setHistory([]);
+    let timer: ReturnType<typeof setInterval> | undefined;
     if (demo) {
       setSnapshot({
         page: {
@@ -62,18 +73,44 @@ export default function Status() {
         ],
       });
     } else {
-      api<Snapshot>(`/api/status/${encodeURIComponent(slug)}`, {
-        signal: controller.signal,
-      })
-        .then(setSnapshot)
-        .catch((e) => {
-          if (!controller.signal.aborted) setError(e.message);
-        });
+      const refresh = async () => {
+        if (document.hidden) return;
+        try {
+          const [current, incidents] = await Promise.all([
+            api<Snapshot>(`/api/status/${encodeURIComponent(slug)}`, {
+              signal: controller.signal,
+            }),
+            api<PublicIncident[]>(
+              `/api/status/${encodeURIComponent(slug)}/history`,
+              { signal: controller.signal },
+            ),
+          ]);
+          if (!controller.signal.aborted) {
+            setSnapshot(current);
+            setHistory(incidents);
+            setError("");
+          }
+        } catch (e) {
+          if (!controller.signal.aborted) setError((e as Error).message);
+        }
+      };
+      void refresh();
+      timer = setInterval(refresh, 30000);
     }
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (timer) clearInterval(timer);
+    };
   }, [slug, demo]);
   return (
-    <div className="public-status">
+    <div
+      className="public-status"
+      style={
+        snapshot?.page.brandColor
+          ? ({ "--accent": snapshot.page.brandColor } as CSSProperties)
+          : undefined
+      }
+    >
       <header>
         <Brand />
         <ThemeToggle />
@@ -87,7 +124,7 @@ export default function Status() {
         </div>
       )}
       <main>
-        {error ? (
+        {error && !snapshot ? (
           <div className="error-state">
             <AlertCircle />
             <h1>Status unavailable</h1>
@@ -102,6 +139,11 @@ export default function Status() {
           </div>
         ) : (
           <>
+            {error && (
+              <p className="form-error" role="status">
+                Could not refresh. Showing the last received status.
+              </p>
+            )}
             <div className="public-status-heading">
               <div>
                 <h1>{snapshot.page.title}</h1>
@@ -197,6 +239,26 @@ export default function Status() {
                 <p>No active incidents.</p>
               )}
             </section>
+            {!demo && history.some((i) => i.status === "resolved") && (
+              <section className="status-incidents">
+                <h2>Recent resolved incidents</h2>
+                {history
+                  .filter((i) => i.status === "resolved")
+                  .slice(0, 20)
+                  .map((i) => (
+                    <article className="data-panel" key={i.id}>
+                      <strong>{i.monitor_name}</strong>
+                      <p>{i.message || "The service has recovered."}</p>
+                      <small>
+                        Resolved{" "}
+                        {new Date(
+                          i.resolved_at || i.started_at,
+                        ).toLocaleString()}
+                      </small>
+                    </article>
+                  ))}
+              </section>
+            )}
           </>
         )}
       </main>

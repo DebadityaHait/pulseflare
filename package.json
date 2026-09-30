@@ -11,6 +11,7 @@
     "deploy": "pnpm -r --if-present deploy"
   },
   "devDependencies": {
+    "@clerk/testing": "^2.2.40",
     "@cloudflare/workers-types": "^4.20260506.0",
     "@playwright/test": "^1.63.0",
     "@types/react": "^19.0.0",

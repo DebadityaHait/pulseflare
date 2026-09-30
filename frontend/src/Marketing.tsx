@@ -87,8 +87,8 @@ export function MarketingNav() {
           <Link className="login-link" to="/login">
             Log in
           </Link>
-          <Link className="button primary small" to="/demo">
-            Explore demo <ArrowUpRight size={14} />
+          <Link className="button primary small" to="/signup">
+            Start monitoring <ArrowUpRight size={14} />
           </Link>
           <button
             className="icon-btn mobile-menu"
@@ -108,22 +108,7 @@ function Hero() {
   const reduce = useReducedMotion();
   return (
     <section className="hero-section">
-      <div className="hero-art" aria-hidden="true">
-        <motion.img
-          src="/images/pulse-sculpture.webp"
-          srcSet="/images/pulse-sculpture-small.webp 700w, /images/pulse-sculpture.webp 1400w"
-          sizes="(max-width: 767px) 100vw, 78vw"
-          alt=""
-          width="1536"
-          height="1024"
-          fetchPriority="high"
-          initial={reduce ? false : { opacity: 0, scale: 1.08 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1.8, ease: "easeOut" }}
-        />
-        <div className="hero-art-fade" />
-      </div>
-      <div className="container hero-content">
+      <div className="container hero-content product-led-hero">
         <motion.div
           initial={reduce ? false : { opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
@@ -143,13 +128,31 @@ function Hero() {
             the loop.
           </p>
           <div className="hero-actions">
-            <Link className="button primary" to="/demo">
-              Explore the live demo <ArrowUpRight size={17} />
-            </Link>
-            <Link className="button ghost" to="/signup">
+            <Link className="button primary" to="/signup">
               Start monitoring <ArrowRight size={16} />
             </Link>
+            <Link className="button ghost" to="/demo">
+              Explore demo <ArrowUpRight size={17} />
+            </Link>
           </div>
+          <p className="hero-footnote">
+            Free to start. Websites, APIs, and scheduled jobs.
+          </p>
+        </motion.div>
+        <motion.div
+          className="hero-product-stage"
+          initial={reduce ? false : { opacity: 0, y: 28 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.85, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <div className="hero-stage-caption">
+            <Activity size={14} />
+            <span>Explore a monitoring workspace</span>
+            <Link to="/demo">
+              Open demo <ArrowUpRight size={13} />
+            </Link>
+          </div>
+          <ProductPreview />
         </motion.div>
       </div>
     </section>
@@ -226,7 +229,7 @@ export function FeaturesSection() {
             curl -fsS "$PULSEFLARE_HEARTBEAT"
           </code>
           <span className="feature-footnote">
-            Heartbeat monitoring · v2 preview
+            Expected intervals. Grace periods. Automatic recovery.
           </span>
         </Reveal>
         <Reveal className="feature-card feature-signal">
@@ -283,7 +286,7 @@ export function FeaturesSection() {
               <Sparkles size={13} /> Sample incident insight
             </span>
             <p>
-              “Latency increased after the latest deployment. Review the search
+              “Latency exceeded the configured threshold. Review the search
               index and connection pool before rolling back.”
             </p>
             <Link to="/demo/incidents/inc-search" className="text-link">
@@ -406,7 +409,7 @@ function DeveloperSection() {
             <Cloud size={20} /> Built on Cloudflare
           </span>
           <p>
-            Workers. D1. Queues. R2.
+            Workers. D1. Queues. Workers AI.
             <br />A small footprint, with a lot going on underneath.
           </p>
           <Link className="text-link" to="/architecture">
@@ -437,8 +440,7 @@ export function PricingSection({
           <span className="muted">Leave room to grow.</span>
         </Heading>
         <p className="section-description">
-          Simple plans for side projects and the teams they become. Public
-          enrollment is coming soon.
+          Free monitoring for your next launch. More room to grow is on the way.
         </p>
       </Reveal>
       <div className="pricing-grid">
@@ -451,17 +453,9 @@ export function PricingSection({
             $0<span>/ month</span>
           </p>
           <p>Keep an eye on what you’re building.</p>
-          <button
-            className="button primary"
-            onClick={() =>
-              notice(
-                "Beta enrollment is coming soon",
-                "The public demo is ready to explore. New workspace enrollment opens after the monitoring engine and production authentication finish validation.",
-              )
-            }
-          >
+          <Link className="button primary" to="/signup">
             Start with Beta <ArrowRight size={16} />
-          </button>
+          </Link>
           <ul>
             {[
               "5 active monitors",
@@ -562,7 +556,7 @@ function FAQ() {
           ],
           [
             "Is Pulseflare accepting new workspaces?",
-            "Public enrollment is coming soon. The current site showcases the product, while the multi-tenant monitoring engine is being completed and validated.",
+            "Yes. Create an account, choose a workspace, and add your first HTTP or heartbeat monitor. Beta includes five active monitors and a public status page.",
           ],
           [
             "Does monitoring depend on AI?",
@@ -570,7 +564,7 @@ function FAQ() {
           ],
           [
             "Where does Pulseflare run?",
-            "The application uses Cloudflare Pages and Workers, with D1, Queues, Workers AI, and R2. The v2 architecture introduces per-monitor Durable Objects and Clerk workspaces.",
+            "Pulseflare runs on Cloudflare Pages and Workers, with D1 storing monitoring evidence, Queues delivering events, and Workers AI providing optional summaries. Clerk handles accounts and workspaces.",
           ],
         ].map(([question, answer]) => (
           <details key={question}>
@@ -633,19 +627,6 @@ export default function Marketing() {
       <MarketingNav />
       <main className="marketing-main">
         <Hero />
-        <section className="container preview-section">
-          <Reveal>
-            <div className="preview-caption">
-              <span>
-                <Activity size={14} /> A clear picture. At every moment.
-              </span>
-              <span>
-                Interactive product preview <ArrowDownRight size={14} />
-              </span>
-            </div>
-            <ProductPreview />
-          </Reveal>
-        </section>
         <FeaturesSection />
         <StatusSection />
         <DeveloperSection />
@@ -661,8 +642,8 @@ export default function Marketing() {
               <br />
               deserves a lookout.
             </h2>
-            <Link className="button primary" to="/demo">
-              Take Pulseflare for a spin <ArrowUpRight size={17} />
+            <Link className="button primary" to="/signup">
+              Start monitoring <ArrowUpRight size={17} />
             </Link>
           </Reveal>
         </section>
@@ -685,8 +666,8 @@ export function FeaturesPage() {
             to keep watch.
           </h1>
           <p>
-            Explore the Pulseflare monitoring experience. Product previews use
-            sample data; public enrollment is coming soon.
+            Monitor your services in a focused workspace. Explore the labeled
+            sample data or start monitoring your own endpoints.
           </p>
         </div>
         <FeaturesSection />
@@ -723,13 +704,13 @@ export function ArchitecturePage() {
     },
     {
       icon: Activity,
-      title: "Monitor coordinator",
-      text: "Planned v2 Durable Objects serialize each monitor’s alarms and state.",
+      title: "Scheduled checks",
+      text: "Worker cron checks due HTTP monitors and heartbeat deadlines. D1 claims prevent overlapping probes.",
     },
     {
       icon: Layers,
-      title: "D1 + R2",
-      text: "Relational monitoring evidence and long-term object storage.",
+      title: "Cloudflare D1",
+      text: "Workspace configuration, check evidence, incident state, and durable event dispatch.",
     },
     {
       icon: GitBranch,
@@ -788,10 +769,10 @@ export function ArchitecturePage() {
           <div>
             <h3>Built with visible boundaries.</h3>
             <p>
-              The current implementation includes a working v1 pipeline and an
-              in-progress v2 workspace API. The demo is isolated from
-              production. Durable Object scheduling, browser push, automated
-              retention, and production onboarding remain launch gates.
+              Monitoring and notifications run independently of AI enrichment.
+              Clerk provides workspace identity. Raw check history expires after
+              seven days. Faster scheduling and R2 archival are planned
+              improvements.
             </p>
           </div>
         </div>
@@ -833,32 +814,32 @@ export function DocsPage() {
           <span className="section-kicker">Pulseflare docs</span>
           <h1>Make yourself at home.</h1>
           <p className="lead">
-            A guide to the demo, the monitoring model, and the upcoming beta.
+            Set up monitoring, connect your alerts, and share service health.
           </p>
           <section id="quickstart">
-            <h2>Try the demo</h2>
+            <h2>Create your first monitor</h2>
             <p>
-              Open the sample Orbit workspace. Select a monitor to inspect its
-              history, follow an incident timeline, or visit its public status
-              page. The demo is read-only and makes no monitoring requests.
+              Sign up with email and password or Google, then create or select a
+              workspace. Add a website or API monitor and run its first check.
+              For a background job, create a heartbeat and copy its secret URL.
             </p>
-            <Link className="button primary" to="/demo">
-              Open the workspace <ArrowRight size={16} />
+            <Link className="button primary" to="/signup">
+              Start monitoring <ArrowRight size={16} />
             </Link>
           </section>
           <section id="monitoring">
             <h2>HTTP and heartbeat monitoring</h2>
             <p>
               HTTP monitors check a public URL against an expected status range.
-              The v2 configuration supports response text, JSON-path assertions,
-              and latency thresholds. Heartbeats are designed for jobs that call
-              a secret URL after completing a run.
+              Checks support response text, JSON-path assertions, and latency
+              thresholds. Heartbeats watch for jobs that call a secret URL after
+              completing a run.
             </p>
             <p>
               Beta limits are five active monitors per workspace and a minimum
-              five-minute HTTP interval. Heartbeat scheduling and failure
-              confirmation are part of the v2 rollout, not a claim about the
-              currently deployed v1 checker.
+              five-minute HTTP interval. Two consecutive failed checks confirm
+              an outage. Heartbeats accept GET or POST and are checked against
+              their expected interval plus grace period about once a minute.
             </p>
           </section>
           <section id="incidents">
@@ -873,18 +854,18 @@ export function DocsPage() {
           <section id="integrations">
             <h2>Bring alerts to your team</h2>
             <p>
-              The existing alert pipeline supports Discord, Telegram, and
-              generic webhooks. The v2 integration model adds encrypted
-              configuration, Slack, notification filters, and signed delivery
-              metadata. Browser push is planned.
+              Connect Slack, Discord, Telegram, or a public HTTPS webhook from
+              Integrations. Send a test and inspect its delivery result.
+              Configuration is encrypted. Webhooks can include an HMAC signature
+              using your signing secret. Browser push is planned.
             </p>
           </section>
           <section id="api">
             <h2>Workspace API keys</h2>
             <p>
-              Workspace admins can create scoped API keys in the v2 API. Full
-              keys are shown once and stored as SHA-256 hashes. Keep them in
-              your secret manager and never commit them to Git.
+              Workspace admins can create scoped API keys. Full keys are shown
+              once and stored as SHA-256 hashes. Keep them in your secret
+              manager and never commit them to Git.
             </p>
             <div className="code-block">
               <div>
@@ -905,17 +886,18 @@ export function DocsPage() {
               The API uses JSON envelopes:{" "}
               <code>{'{ "ok": true, "data": ... }'}</code>. Authenticated
               workspace routes require Clerk organization context or a scoped
-              API key. Production API enrollment is coming soon.
+              API key. Create and revoke keys from your workspace's API keys
+              screen.
             </p>
           </section>
           <section id="security">
             <h2>Security boundaries</h2>
             <p>
-              The v2 API scopes customer resources to a workspace. Integration
+              The API scopes customer resources to a workspace. Integration
               secrets use AES-GCM encryption. Public monitor targets must use
-              HTTP or HTTPS. Further SSRF hardening, durable rate limiting, and
-              end-to-end authentication validation remain required before public
-              beta enrollment.
+              HTTP or HTTPS. Private IP literals and internal hostnames are
+              blocked; redirects are not followed. Never put secrets in endpoint
+              URLs.
             </p>
           </section>
           <section id="privacy">
@@ -927,11 +909,9 @@ export function DocsPage() {
             </p>
             <p>
               Live monitoring stores endpoint configuration, response timing,
-              and incident evidence. The beta retention policy targets seven
-              days of raw checks and 90 days of hourly history; automated
-              archival is still under development. Do not send credentials in
-              URLs. Production terms and privacy disclosures will be published
-              before enrollment opens.
+              and incident evidence. Beta includes seven days of raw check
+              history. Longer retention and archival are planned. Accounts use
+              Clerk's development environment during this initial release.
             </p>
           </section>
         </article>

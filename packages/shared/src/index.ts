@@ -6,3 +6,4 @@ export * from "./severity";
 export * from "./prompts";
 export * from "./entitlements";
 export * from "./security";
+export * from "./monitoring";

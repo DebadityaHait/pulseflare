@@ -17,3 +17,7 @@ id = "b5a81e5554bd4386b77f018c6d34a972"
 [[queues.producers]]
 binding = "INCIDENT_QUEUE"
 queue = "incident-events"
+
+[[queues.producers]]
+binding = "ALERT_QUEUE"
+queue = "alert-events"

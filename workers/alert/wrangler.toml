@@ -11,3 +11,4 @@ database_id = "8c45da35-ca25-449d-b336-3fe2f96efb49"
 queue = "alert-events"
 max_batch_size = 10
 max_batch_timeout = 30
+max_retries = 5

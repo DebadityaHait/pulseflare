@@ -36,7 +36,7 @@ const webhookUrl = z.string().url().refine((value) => value.startsWith("https://
 const monitorSchemaBase = z.object({
   name: z.string().trim().min(1).max(120),
   type: z.enum(["http", "heartbeat"]).default("http"),
-  url: z.string().refine(isValidMonitorUrl, "URL must be a valid public http or https URL"),
+  url: z.string().default(""),
   method: z.enum(["GET", "HEAD", "POST"]).default("GET"),
   intervalS: z.number().int().min(300).max(86400).default(300),
   timeoutMs: z.number().int().min(500).max(30000).default(10000),
@@ -48,7 +48,7 @@ const monitorSchemaBase = z.object({
   requestBody: z.string().max(32768).optional(),
   expectedText: z.string().max(500).optional(),
   forbiddenText: z.string().max(500).optional(),
-  jsonPath: z.string().regex(/^[A-Za-z0-9_$.[\]-]+$/).max(120).optional(),
+  jsonPath: z.string().max(120).refine(v=>!v || /^[A-Za-z0-9_$.[\]-]+$/.test(v),"Invalid JSON path").optional(),
   latencyThresholdMs: z.number().int().min(1).max(120000).nullable().optional(),
   heartbeatExpectedS: z.number().int().min(60).max(2592000).optional(),
   heartbeatGraceS: z.number().int().min(0).max(2592000).optional(),
@@ -58,9 +58,14 @@ const monitorSchemaBase = z.object({
 });
 
 export const createMonitorSchema = monitorSchemaBase.superRefine((data, ctx) => {
+  if (data.type === "http" && !isValidMonitorUrl(data.url)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "URL must be a valid public http or https URL", path: ["url"] });
   if (data.expectedStatusMin > data.expectedStatusMax) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Expected status range is invalid", path: ["expectedStatusMax"] });
   if (data.type === "heartbeat" && !data.heartbeatExpectedS) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Heartbeat monitors require an expected frequency", path: ["heartbeatExpectedS"] });
   if (data.type === "heartbeat" && data.method !== "GET") ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Heartbeat monitors use GET", path: ["method"] });
+  if (data.headers) {
+    for (const key of Object.keys(data.headers)) if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(key) || /^(host|content-length|connection|cf-|x-forwarded|transfer-encoding)/i.test(key)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Unsupported request header", path: ["headers"] });
+    if (Object.values(data.headers).some(v => /[\r\n]/.test(v))) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Header values cannot contain newlines", path: ["headers"] });
+  }
 });
 
 export const updateMonitorSchema = monitorSchemaBase.partial().refine((data) => {

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import app, { type Env, requiredApiKeyScope } from "../workers/api/src/index";
 import { sha256Hex } from "@pulseflare/shared";
+import { d1 } from './d1';
 
 let db: DatabaseSync;
 let env: Env;
@@ -52,7 +53,9 @@ beforeEach(() => {
   db.exec(
     "INSERT INTO workspaces(id,clerk_org_id,name,slug) VALUES ('other','org_other','Other','other'); INSERT INTO workspace_entitlements(workspace_id) VALUES ('other'); INSERT INTO monitors(id,workspace_id,name,url,public) VALUES ('private','other','Private endpoint','https://private.example.com',0),('visible','other','Public endpoint','https://example.com',1); INSERT INTO status_pages(workspace_id,slug,title) VALUES ('other','other','Other status')",
   );
-  env = { DB: adapter(db), DEV_AUTH_BYPASS: "true" };
+  db.exec(readFileSync(new URL('../migrations/0003_mvp.sql',import.meta.url),'utf8'));
+  db.exec("INSERT INTO status_components(id,workspace_id,status_page_id,name) SELECT 'other-services','other',id,'Services' FROM status_pages WHERE slug='other'; INSERT INTO status_component_monitors(workspace_id,component_id,monitor_id) VALUES('other','other-services','visible')");
+  env = { DB: d1(db), DEV_AUTH_BYPASS: "true" };
 });
 afterEach(() => db.close());
 function request(path: string, init: RequestInit = {}, workspace = "legacy") {
@@ -185,13 +188,10 @@ describe("tenant and authentication boundaries", () => {
         ?.active,
     ).toBe(0);
   });
-  it("does not pretend unsupported manual or heartbeat checks succeeded", async () => {
-    expect(
-      (await request("/api/monitors/existing/test", { method: "POST" })).status,
-    ).toBe(503);
+  it("rejects invalid heartbeat secrets and accepts advertised assertions", async () => {
     expect(
       (await request("/api/heartbeat/missing", { method: "POST" })).status,
-    ).toBe(503);
+    ).toBe(404);
     expect(
       (
         await request("/api/monitors", {
@@ -203,7 +203,7 @@ describe("tenant and authentication boundaries", () => {
           }),
         })
       ).status,
-    ).toBe(503);
+    ).toBe(201);
   });
   it("keeps unobserved services unknown and public summaries sanitized", async () => {
     db.exec(

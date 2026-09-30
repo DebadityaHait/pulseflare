@@ -1,10 +1,12 @@
 import {
   ClerkProvider,
+  CreateOrganization,
   OrganizationSwitcher,
   SignIn,
   SignUp,
   UserButton,
   useAuth,
+  useOrganization,
 } from "@clerk/clerk-react";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -15,6 +17,7 @@ import Workspace from "./Workspace";
 type Mode = "login" | "signup" | "workspace";
 function Gate({ mode }: { mode: Mode }) {
   const { isLoaded, isSignedIn, orgId, getToken } = useAuth();
+  const { organization } = useOrganization();
   const [ready, setReady] = useState(false);
   useEffect(() => {
     setTokenProvider(getToken);
@@ -32,16 +35,15 @@ function Gate({ mode }: { mode: Mode }) {
       <Workspace
         demo={false}
         key={orgId}
-        userControl={
-          <>
-            <OrganizationSwitcher
-              hidePersonal
-              afterSelectOrganizationUrl="/dashboard"
-              afterCreateOrganizationUrl="/dashboard"
-            />
-            <UserButton />
-          </>
+        workspaceName={organization?.name}
+        organizationControl={
+          <OrganizationSwitcher
+            hidePersonal
+            afterSelectOrganizationUrl="/dashboard"
+            afterCreateOrganizationUrl="/dashboard"
+          />
         }
+        userControl={<UserButton />}
       />
     );
   return (
@@ -54,6 +56,11 @@ function Gate({ mode }: { mode: Mode }) {
             hidePersonal
             afterSelectOrganizationUrl="/dashboard"
             afterCreateOrganizationUrl="/dashboard"
+          />
+          <CreateOrganization
+            routing="hash"
+            afterCreateOrganizationUrl="/dashboard"
+            skipInvitationScreen
           />
         </>
       ) : mode === "signup" ? (
@@ -91,6 +98,17 @@ function AuthLayout({ children }: { children: React.ReactNode }) {
   );
 }
 export default function Auth({ mode }: { mode: Mode }) {
+  const [theme, setTheme] = useState(document.documentElement.dataset.theme);
+  useEffect(() => {
+    const observer = new MutationObserver(() =>
+      setTheme(document.documentElement.dataset.theme),
+    );
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => observer.disconnect();
+  }, []);
   const key = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
   if (!key)
     return (
@@ -115,7 +133,33 @@ export default function Auth({ mode }: { mode: Mode }) {
       </AuthLayout>
     );
   return (
-    <ClerkProvider publishableKey={key}>
+    <ClerkProvider
+      publishableKey={key}
+      signInUrl="/login"
+      signUpUrl="/signup"
+      appearance={{
+        variables: {
+          colorPrimary: "#ed7626",
+          colorBackground: theme === "light" ? "#faf9f6" : "#17191c",
+          colorText: theme === "light" ? "#23262b" : "#eeeef0",
+          colorTextSecondary: theme === "light" ? "#62666d" : "#a2a5ae",
+          colorInputBackground: theme === "light" ? "#f0efeb" : "#101215",
+          colorInputText: theme === "light" ? "#23262b" : "#eeeef0",
+          fontFamily: "Geist Variable, sans-serif",
+          borderRadius: "10px",
+        },
+        elements: {
+          cardBox: "pulse-auth-card",
+          card: "pulse-auth-card-inner",
+          formButtonPrimary: "pulse-auth-submit",
+          organizationSwitcherTrigger: "pulse-org-trigger",
+        },
+        layout: {
+          socialButtonsPlacement: "top",
+          socialButtonsVariant: "blockButton",
+        },
+      }}
+    >
       <Gate mode={mode} />
     </ClerkProvider>
   );

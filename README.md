@@ -7,20 +7,20 @@ Pulseflare is a serverless monitoring system that checks HTTP services, detects 
 **Live demo:** https://pulseflare.pages.dev  
 **API:** https://pulseflare-api.opener.workers.dev
 
-## Presentation-first release (local, not deployed)
+## Functional Beta MVP
 
-The new site has an animated graphite/orange homepage, original optimized artwork, interactive product previews, pricing with coming-soon dialogs, architecture and documentation pages, and a responsive light/dark workspace. `/demo` is a populated, read-only Orbit workspace. Its services, metrics, delivery records, and incident evidence are explicitly fictional; it makes no API requests or notifications. Incident reports can be exported as Markdown.
+The website has an animated graphite/orange homepage with an interactive monitoring preview, themed Clerk signup, pricing with coming-soon paid plans, architecture/docs pages, and a responsive light/dark workspace. Signup opens real monitoring. `/demo` is a separate read-only Orbit workspace with explicitly fictional data and no API mutations.
 
 ```bash
 pnpm install
 pnpm --filter frontend dev
 ```
 
-Open `http://localhost:5173` for the website or `/demo` for the workspace. No credentials are needed. Leave `VITE_CLERK_PUBLISHABLE_KEY` unset for the portfolio deployment: login/signup then present a polished coming-soon page. For connected development, set the frontend `VITE_*` variables from `.env.example` in `frontend/.env.local`, and configure the corresponding API secrets and authorized origins separately.
+Open `http://localhost:5173`. Demo routes require no credentials. Real accounts use the development Clerk keys in the root `.env`; Vite exposes only the publishable key. Organizations must be enabled. Run `node scripts/configure-clerk.mjs` once to enable them on the development instance. Configure API Worker secrets separately; never place secrets in `VITE_*` variables.
 
-The v2 API uses Clerk organization sessions or scoped API keys, not the retired browser-stored admin token. Basic HTTP monitor creation, listing, checks, pause/resume, incident updates, and workspace API-key management have connected UI paths. Authentication against a real Clerk tenant has not been end-to-end verified in this release.
+The API uses Clerk organization sessions or scoped API keys. HTTP checks, assertions, encrypted headers, heartbeat deadlines/recovery/rotation, incident updates, encrypted notification integrations, delivery logs, public-page selection, and API keys are connected to real Workers/D1 data. Alerts dispatch independently of optional, quota-limited AI enrichment.
 
-See [release notes and launch gates](docs/PRESENTATION_RELEASE.md) before deploying workers or enabling public enrollment. The original live URLs above have not been updated by this implementation.
+See [MVP runtime and release checks](docs/MVP_RELEASE.md) and the [deferred feature backlog](TODO.md). The frontend remains on `pulseflare.pages.dev`; a Pages service binding proxies `/api/*` to the API Worker. The active scheduler is a minute cron with atomic D1 leases. Durable Objects, archives/rollups, billing, and other advanced additions are deferred.
 
 ## Why It Matters
 
@@ -40,7 +40,7 @@ The AI layer is intentionally asynchronous and guarded by deterministic fallback
 - **Cloudflare-native architecture:** Workers, Cron Triggers, D1, KV, Queues, R2, Workers AI, and Pages.
 - **AI incident intelligence:** incident summaries, anomaly explanations, and severity scoring via Workers AI.
 - **Noise-aware alerting:** severity-based routing with Discord, Telegram, and generic webhook support.
-- **Fast public status reads:** latest monitor state cached in KV, durable history stored in D1.
+- **Fast public status reads:** selected public monitor state cached for 30 seconds at the edge, evidence stored in D1.
 - **Typed full-stack implementation:** strict TypeScript across shared logic, Workers, tests, and React frontend.
 - **Product showcase:** responsive homepage, theme-aware workspace, public demo, incident exports, integrations preview, usage, status pages, and honest coming-soon plans.
 
@@ -51,21 +51,20 @@ flowchart LR
   Pages[React + Cloudflare Pages] --> API[API Worker]
   Cron[Cloudflare Cron] --> Checker[Checker Worker]
   Checker --> D1[(D1)]
-  Checker --> KV[(KV)]
-  Checker --> IQ[Incident Queue]
+  Checker --> Outbox[D1 transactional outbox]
+  Outbox --> IQ[Incident Queue]
+  Outbox --> AQ[Alert Queue]
   IQ --> AI[AI Worker]
   AI --> WAI[Workers AI]
-  AI --> AQ[Alert Queue]
   AQ --> Alert[Alert Worker]
   Alert --> D1
-  API --> R2[(R2 Archive)]
 ```
 
 ## System Design
 
 Pulseflare separates the critical monitoring path from slower AI and notification work.
 
-- The checker Worker wakes on a one-minute cron but respects each HTTP monitor's interval (minimum five minutes), performs checks with timeouts, writes workspace-scoped evidence to D1, and updates KV. It does not expose a public run-check endpoint.
+- The checker Worker wakes on a one-minute cron, claims due HTTP checks with D1 leases, confirms outages after two failures, and detects missed heartbeat deadlines. It writes workspace-scoped evidence and transactional outbox events to D1.
 - State transitions create queue messages instead of blocking the checker.
 - The AI Worker consumes incident and anomaly events, calls Workers AI, validates model output, and stores summaries/severity in D1.
 - The alert Worker consumes routed alert events and logs every delivery decision.

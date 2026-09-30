@@ -3513,3 +3513,328 @@ meter::-moz-meter-bar {
     backdrop-filter: none;
   }
 }
+
+/* The hero uses the same monitoring components as the product demo. */
+.hero-section:has(.product-led-hero) {
+  min-height: 0;
+  padding: 100px 0 80px;
+  overflow: visible;
+}
+.hero-content.product-led-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 0.84fr) minmax(0, 1.3fr);
+  align-items: center;
+  gap: 48px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.product-led-hero h1 {
+  font-size: clamp(44px, 4.8vw, 74px);
+}
+.product-led-hero > div:first-child {
+  min-width: 0;
+}
+.hero-content .hero-footnote {
+  margin-top: 20px;
+  font-size: 12px;
+  max-width: none;
+}
+.hero-product-stage {
+  min-width: 0;
+}
+.hero-stage-caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.hero-stage-caption a {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text);
+}
+.hero-product-stage .product-preview {
+  box-shadow: var(--shadow);
+  border-color: var(--line-strong);
+}
+.hero-product-stage .preview-body {
+  grid-template-columns: 115px minmax(0, 1fr);
+  min-height: 390px;
+}
+.hero-product-stage .preview-content {
+  padding: 24px 22px;
+  min-width: 0;
+}
+.hero-product-stage .preview-heading h2 {
+  font-size: 23px;
+}
+.hero-product-stage .preview-nav {
+  padding: 23px 12px;
+}
+.hero-product-stage .preview-nav button {
+  font-size: 11px;
+}
+.hero-product-stage .preview-address {
+  display: none;
+}
+.hero-product-stage .preview-metrics strong {
+  font-size: 30px;
+}
+.hero-product-stage .monitor-row {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 58px 55px 14px;
+  gap: 8px;
+}
+.hero-product-stage .table-labels {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 58px 55px 14px;
+  gap: 8px;
+}
+.hero-product-stage .monitor-name strong {
+  font-size: 11px;
+}
+.hero-product-stage .monitor-name small {
+  font-size: 9px;
+  max-width: 110px;
+}
+.hero-product-stage .monitor-name {
+  gap: 8px;
+}
+.hero-product-stage .monitor-row .mono {
+  font-size: 10px;
+}
+.hero-product-stage .monitor-icon {
+  width: 28px;
+  height: 28px;
+}
+.hero-product-stage .preview-chrome {
+  padding: 14px 18px;
+}
+.hero-product-stage .preview-workspace {
+  font-size: 11px;
+}
+.hero-product-stage .preview-sample {
+  font-size: 9px;
+}
+.plain-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.plain-fieldset:disabled {
+  opacity: 0.75;
+}
+.plain-fieldset label {
+  display: grid;
+  gap: 8px;
+}
+.check-label {
+  display: flex !important;
+  align-items: center;
+  gap: 10px !important;
+}
+.check-label input {
+  width: 16px !important;
+  height: 16px !important;
+  accent-color: var(--accent);
+}
+.secret-code {
+  display: block;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--accent-text);
+  font-size: 12px;
+}
+.advanced-settings summary {
+  cursor: pointer;
+  color: var(--text);
+}
+.advanced-settings[open] {
+  display: grid;
+  gap: 16px;
+}
+.advanced-settings[open] > summary {
+  margin-bottom: 14px;
+}
+.evidence-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.evidence-row time {
+  min-width: 160px;
+  color: var(--muted);
+}
+.evidence-row small {
+  color: var(--muted);
+}
+.evidence-row:last-child {
+  border-bottom: 0;
+}
+.small-metric {
+  font-size: 17px !important;
+  line-height: 1.4 !important;
+}
+.component-choice .badge {
+  margin-left: auto;
+}
+.danger-panel {
+  padding: 15px 0;
+  margin-top: 30px;
+}
+.confirm-box {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+}
+.pulse-auth-card {
+  width: 100%;
+  max-width: 410px;
+  box-shadow: none !important;
+}
+.pulse-auth-card-inner {
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow) !important;
+}
+.pulse-auth-submit {
+  color: var(--accent-ink) !important;
+  background: var(--accent) !important;
+  font-weight: 600;
+}
+.pulse-org-trigger {
+  max-width: 180px;
+}
+.auth-page main .cl-rootBox {
+  max-width: 100%;
+}
+.auth-page .cl-headerTitle {
+  font-size: 26px;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+  color: var(--text);
+}
+.auth-page .cl-socialButtonsBlockButton {
+  color: var(--text);
+  background: var(--panel-high);
+  border: 1px solid var(--line-strong);
+}
+.auth-page .cl-socialButtonsBlockButtonText {
+  color: var(--text);
+}
+.auth-page .cl-headerSubtitle,
+.auth-page .cl-footerActionText {
+  color: var(--muted);
+}
+.auth-page .cl-dividerLine {
+  background: var(--line);
+}
+.auth-page .cl-formFieldInput {
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+}
+.auth-page .cl-formFieldInputShowPasswordButton {
+  color: var(--muted);
+}
+@media (max-width: 1199px) {
+  .hero-content.product-led-hero {
+    grid-template-columns: 1fr;
+    gap: 42px;
+    max-width: 900px;
+  }
+  .hero-section:has(.product-led-hero) {
+    padding-top: 72px;
+  }
+  .hero-product-stage .preview-body {
+    grid-template-columns: 140px minmax(0, 1fr);
+  }
+  .hero-product-stage .preview-content {
+    padding: 28px;
+  }
+}
+@media (max-width: 767px) {
+  .hero-section:has(.product-led-hero) {
+    padding: 48px 0 40px;
+  }
+  .hero-content.product-led-hero {
+    padding-left: 20px;
+    padding-right: 20px;
+    gap: 32px;
+  }
+  .product-led-hero h1 {
+    font-size: 48px;
+  }
+  .hero-product-stage .preview-body {
+    display: block;
+    min-height: 390px;
+  }
+  .hero-product-stage .preview-nav {
+    display: flex;
+    padding: 10px 12px;
+    gap: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+  .hero-product-stage .preview-nav-title,
+  .hero-product-stage .preview-side-bottom {
+    display: none;
+  }
+  .hero-product-stage .preview-nav button {
+    padding: 8px 12px;
+  }
+  .hero-product-stage .preview-content {
+    padding: 20px 14px;
+  }
+  .hero-product-stage .preview-heading h2 {
+    font-size: 22px;
+  }
+  .hero-product-stage .monitor-row {
+    grid-template-columns: minmax(0, 1fr) 55px 12px;
+  }
+  .hero-product-stage .table-labels {
+    display: none;
+  }
+  .hero-product-stage .monitor-row > .uptime-bar,
+  .hero-product-stage .monitor-row > .mono:first-of-type {
+    display: none;
+  }
+  .hero-product-stage .preview-workspace {
+    font-size: 10px;
+    gap: 6px;
+  }
+  .hero-stage-caption {
+    font-size: 10px;
+  }
+  .hero-product-stage .preview-chrome {
+    padding: 12px;
+  }
+  .hero-content .hero-footnote {
+    font-size: 11px;
+  }
+  .hero-product-stage .preview-metrics strong {
+    font-size: 26px;
+  }
+  .hero-product-stage .preview-metrics {
+    gap: 10px;
+  }
+  .evidence-row {
+    gap: 10px;
+  }
+  .pulse-org-trigger {
+    max-width: 125px;
+  }
+}

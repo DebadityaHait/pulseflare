@@ -22,6 +22,8 @@ export interface Monitor {
   heartbeatExpectedS?: number | null;
   heartbeatGraceS?: number | null;
   heartbeatUrl?: string | null;
+  heartbeatLastAt?: string | null;
+  heartbeatDeadlineAt?: string | null;
   secretConfigured?: boolean;
   lastCheckedAt?: string | null;
   lastState?: MonitorState;
@@ -115,6 +117,8 @@ export type AlertQueueEvent = {
   severity: number;
   summary: string;
   createdAt: string;
+  integrationId?: string;
+  test?: boolean;
 };
 
 export interface Workspace {

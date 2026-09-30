@@ -47,6 +47,12 @@ import {
 } from "react-router-dom";
 import { api } from "./api/client";
 import {
+  LiveIntegrations,
+  LiveStatusBuilder,
+  LiveMonitorDetail,
+  MonitorEditor,
+} from "./live";
+import {
   Badge,
   Brand,
   CopyButton,
@@ -77,6 +83,7 @@ function Integrations() {
     { id: "discord", kind: "discord", name: "Operations", enabled: false },
   ]);
   const [selected, setSelected] = useState<string | null>(null);
+  if (!demo) return <LiveIntegrations />;
   return (
     <>
       <PageHeader
@@ -429,6 +436,7 @@ function StatusBuilder() {
   ]);
   const notice = useNotice();
   const page = result.data[0];
+  if (!demo) return <LiveStatusBuilder />;
   return (
     <>
       <PageHeader
@@ -828,9 +836,13 @@ const manageItems = [
 export default function Workspace({
   demo = true,
   userControl,
+  organizationControl,
+  workspaceName,
 }: {
   demo?: boolean;
   userControl?: ReactNode;
+  organizationControl?: ReactNode;
+  workspaceName?: string;
 }) {
   const base = demo ? "/demo" : "/dashboard";
   const [mobile, setMobile] = useState(false);
@@ -850,14 +862,20 @@ export default function Workspace({
               <X size={18} />
             </button>
           </div>
-          <div className="workspace-switcher">
-            <span className="workspace-avatar">{demo ? "o" : "p"}</span>
-            <div>
-              <strong>{demo ? "Orbit workspace" : "Your workspace"}</strong>
-              <small>{demo ? "Demo workspace" : "Clerk organization"}</small>
+          {organizationControl ? (
+            <div className="workspace-switcher">{organizationControl}</div>
+          ) : (
+            <div className="workspace-switcher">
+              <span className="workspace-avatar">{demo ? "o" : "p"}</span>
+              <div>
+                <strong>
+                  {demo ? "Orbit workspace" : workspaceName || "Your workspace"}
+                </strong>
+                <small>{demo ? "Demo workspace" : "Workspace"}</small>
+              </div>
+              <ChevronRight size={14} />
             </div>
-            <ChevronRight size={14} />
-          </div>
+          )}
           <nav aria-label="Workspace navigation">
             {navItems.map(({ to, label, icon: Icon }) => (
               <NavLink end to={`${base}${to}`} key={to}>
@@ -977,7 +995,7 @@ function Overview() {
   const stats = useResource("/api/stats", {
     activeMonitors: 4,
     openIncidents: 1,
-    uptime24h: 99.91,
+    uptime24h: 99.91 as number | null,
     avgLatency24h: 128,
   });
   return (
@@ -1003,8 +1021,11 @@ function Overview() {
           {[
             {
               label: "Overall uptime",
-              number: stats.data.uptime24h.toFixed(2),
-              unit: "%",
+              number:
+                stats.data.uptime24h === null
+                  ? "Awaiting checks"
+                  : stats.data.uptime24h.toFixed(2),
+              unit: stats.data.uptime24h === null ? "" : "%",
               note: "Last 24 hours",
               icon: Activity,
             },
@@ -1253,6 +1274,7 @@ function MonitorDetail() {
           time: new Date(c.checked_at).toLocaleTimeString(),
           latency: c.latency_ms,
         }));
+  if (!demo) return <LiveMonitorDetail />;
   if (demo && sample?.type === "heartbeat")
     return (
       <>
@@ -1287,8 +1309,8 @@ function MonitorDetail() {
             times.
           </p>
           <p className="form-hint">
-            Illustrative v2 experience. Live heartbeat scheduling is coming
-            soon.
+            Sample heartbeat evidence. Create your own monitor in a signed-in
+            workspace.
           </p>
           <button className="button secondary small" onClick={toggle}>
             Pause monitor
@@ -1478,6 +1500,7 @@ function NewMonitor() {
   const [type, setType] = useState<"http" | "heartbeat">("http");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  if (!demo) return <MonitorEditor />;
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (demo)
@@ -1498,7 +1521,7 @@ function NewMonitor() {
           intervalS: Number(f.get("intervalS")),
           method: "GET",
           timeoutMs: Number(f.get("timeoutMs")),
-          public: false,
+          public: f.get("public") === "on",
         }),
       });
       navigate(`${base}/monitors/${result.monitor.id}`);
@@ -1744,7 +1767,7 @@ function IncidentDetail() {
         body: JSON.stringify({
           message: f.get("message"),
           status: f.get("status"),
-          public: false,
+          public: f.get("public") === "on",
         }),
       });
       form.reset();
@@ -1790,7 +1813,10 @@ function IncidentDetail() {
                 </div>
                 <div>
                   <small>Duration</small>
-                  <strong>{sample?.duration || "See timeline"}</strong>
+                  <strong>
+                    {sample?.duration ||
+                      `${Math.max(0, Math.round((new Date(result.data.incident.resolved_at || Date.now()).getTime() - new Date(result.data.incident.started_at).getTime()) / 60000))} min`}
+                  </strong>
                 </div>
                 <Link
                   to={`${base}/monitors/${result.data.incident.monitor_id}`}
@@ -1830,7 +1856,27 @@ function IncidentDetail() {
                         </div>
                       </div>
                     ))
-                  : result.data.updates.map((t) => (
+                  : [
+                      {
+                        id: "detected",
+                        status: "Incident detected",
+                        message:
+                          "Confirmed monitoring evidence opened this incident.",
+                        created_at: result.data.incident.started_at,
+                      },
+                      ...result.data.updates,
+                      ...(result.data.incident.resolved_at
+                        ? [
+                            {
+                              id: "recovered",
+                              status: "Resolved",
+                              message:
+                                "The incident was resolved. See the recorded updates for details.",
+                              created_at: result.data.incident.resolved_at,
+                            },
+                          ]
+                        : []),
+                    ].map((t) => (
                       <div className="timeline-event" key={t.id}>
                         <span className="timeline-node">
                           <Activity size={15} />
@@ -1844,7 +1890,7 @@ function IncidentDetail() {
                     ))}
                 <form className="incident-composer" onSubmit={update}>
                   <label>
-                    Add an internal update
+                    Add an incident update
                     <textarea
                       name="message"
                       required
@@ -1852,8 +1898,15 @@ function IncidentDetail() {
                       placeholder="What have you found?"
                     />
                   </label>
+                  <label className="check-label">
+                    <input type="checkbox" name="public" /> Publish on the
+                    public status page
+                  </label>
                   <div className="button-row">
                     <select name="status" aria-label="Incident lifecycle">
+                      {result.data.incident.status === "resolved" && (
+                        <option value="resolved">Resolved</option>
+                      )}
                       <option value="investigating">Investigating</option>
                       <option value="identified">Identified</option>
                       <option value="monitoring">Monitoring</option>

@@ -14,10 +14,20 @@ id = "b5a81e5554bd4386b77f018c6d34a972"
 
 [vars]
 ALLOWED_ORIGIN = "https://pulseflare.pages.dev"
+CLERK_AUTHORIZED_PARTIES = "https://pulseflare.pages.dev,http://localhost:5173,http://localhost:4173"
+
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 60, period = 60 }
 
 [[queues.producers]]
 binding = "ALERT_QUEUE"
 queue = "alert-events"
+
+[[queues.producers]]
+binding = "INCIDENT_QUEUE"
+queue = "incident-events"
 
 [[r2_buckets]]
 binding = "ARCHIVE_BUCKET"

@@ -2,13 +2,14 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import checker, { type Env } from "../workers/checker/src/index";
+import { d1 } from './d1';
 
 let db: DatabaseSync;
 let env: Env;
 const send = vi.fn();
 beforeEach(() => {
   db = new DatabaseSync(":memory:");
-  for (const file of ["0001_schema.sql", "0002_v2.sql"])
+  for (const file of ["0001_schema.sql", "0002_v2.sql", "0003_mvp.sql"])
     db.exec(
       readFileSync(new URL(`../migrations/${file}`, import.meta.url), "utf8"),
     );
@@ -48,6 +49,7 @@ beforeEach(() => {
     INCIDENT_QUEUE: { send } as unknown as Env["INCIDENT_QUEUE"],
   };
   send.mockClear();
+  env.DB=d1(db);
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => new Response("OK", { status: 200 })),
@@ -87,10 +89,14 @@ describe("scheduled HTTP checking", () => {
       new Response("Unavailable", { status: 503 }),
     );
     await tick();
+    expect(send).not.toHaveBeenCalled();
+    db.exec("UPDATE monitors SET last_checked_at='2020-01-01T00:00:00Z'");
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Unavailable',{status:503}));
+    await tick();
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaceId: "tenant",
-        type: "incident.created",
+        type: "incident.opened",
         eventId: expect.stringContaining(":opened"),
       }),
     );
