@@ -1,5 +1,39 @@
 /* Pulseflare: graphite/orange. Radius scale: controls 7px, panels 12px, stage 16px.
    Layers: page 0, sticky navigation 20, mobile navigation 30, native dialogs top layer. */
+.deployment-row { display:flex; gap:14px; align-items:center; padding:18px 24px; border-bottom:1px solid var(--line); }
+.deployment-row > svg { color:var(--accent); flex-shrink:0; }
+.deployment-row > div { flex:1; min-width:0; overflow-wrap:anywhere; }
+.deployment-row small, .deployment-row time { display:block; color:var(--muted); font-size:11px; margin-top:5px; }
+.deployment-monitors { border:1px solid var(--line); border-radius:8px; padding:16px; }
+.deployment-monitors label { display:flex; align-items:center; gap:10px; margin:10px 0; }
+.deployment-monitors input { width:auto; }
+.product-state, .product-help, .recent-deployments { padding:24px; }
+.product-help h2 { font-size:20px; margin-bottom:12px; }
+.product-help p { margin-bottom:18px; color:var(--muted); }
+.product-pagination { display:flex; justify-content:flex-end; gap:10px; padding:16px 24px; }
+.postmortem-form label { display:block; font-size:13px; margin:20px 0; }
+.postmortem-form textarea { width:100%; margin-top:8px; resize:vertical; }
+.report-evidence { margin-top:24px; font-size:12px; color:var(--muted); }
+.report-evidence pre { overflow-wrap:anywhere; }
+.monitor-tag-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+.monitor-tag-filters .selected { border-color:var(--accent); color:var(--accent-text); background:var(--accent-soft); }
+.status-distribution { margin-top:24px; display:grid; gap:20px; }
+.status-distribution > div { display:grid; gap:8px; justify-items:start; }
+.status-distribution code { overflow-wrap:anywhere; font-size:12px; max-width:100%; color:var(--muted); }
+.workflow-features { padding-block:70px; }
+.workflow-features > h2 { font-size:32px; margin-bottom:35px; }
+.workflow-features > div { display:grid; grid-template-columns:1.2fr 1fr; gap:50px; }
+.workflow-features article > svg { color:var(--accent); }
+.workflow-features h3 { margin:18px 0 10px; font-size:23px; }
+.workflow-features p { color:var(--muted); margin-bottom:20px; max-width:50ch; }
+.workflow-features > p { margin-top:35px; }
+@media(max-width:640px) {
+ .deployment-row, .product-state, .product-help, .recent-deployments { padding:16px; }
+ .workflow-features > div { grid-template-columns:1fr; gap:35px; }
+ .filter-bar { flex-wrap:wrap; }
+ .filter-bar .search-box { flex-basis:100%; }
+ .filter-bar select { max-width:100%; }
+}
 .incident-chat .panel-heading h2 { display: flex; align-items: center; gap: 9px; }
 .incident-chat .panel-heading p { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
 .chat-transcript { padding: 24px; max-height: 560px; overflow-y: auto; overscroll-behavior: contain; }

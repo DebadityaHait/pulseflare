@@ -73,9 +73,36 @@ export default async function smoke(page, origin = "http://127.0.0.1:5173") {
   await page.getByRole("heading", { name: "No monitors match" }).waitFor();
   await page.getByRole("textbox", { name: "Search monitors" }).fill("");
   await page.getByLabel("Filter monitors").selectOption("heartbeat");
+  await page.waitForFunction(
+    () => document.querySelectorAll(".monitor-row").length === 1,
+  );
   check(
     (await page.locator(".monitor-row").count()) === 1,
     "Heartbeat filter incorrect",
+  );
+  await page.getByLabel("Filter environment").selectOption("production");
+  await page.getByRole("button", { name: "background", exact: true }).click();
+  await page.reload();
+  check(
+    (await page.getByLabel("Filter monitors").inputValue()) === "heartbeat",
+    "Monitor type filter did not survive reload",
+  );
+  check(
+    (await page.getByLabel("Filter environment").inputValue()) === "production",
+    "Environment filter did not survive reload",
+  );
+  check(
+    (await page
+      .getByRole("button", { name: "background", exact: true })
+      .getAttribute("aria-pressed")) === "true",
+    "Tag filter did not survive reload",
+  );
+  await page.goto(`${origin}/demo/deployments`);
+  check(
+    !(await page
+      .getByRole("button", { name: "Record deployment", exact: true })
+      .isVisible()),
+    "Demo allowed deployment creation",
   );
   await page.goto(`${origin}/demo/monitors/website`);
   await page.getByRole("button", { name: "Pause monitor" }).click();
@@ -112,6 +139,10 @@ export default async function smoke(page, origin = "http://127.0.0.1:5173") {
       "pulseflare-inc-search-sample.md",
     "Export filename incorrect",
   );
+  await page.goto(`${origin}/demo/incidents/inc-search?tab=chat`);
+  await page
+    .getByRole("heading", { name: "Ask about this incident", exact: true })
+    .waitFor();
   const routes = [
     "/",
     "/features",
@@ -126,6 +157,7 @@ export default async function smoke(page, origin = "http://127.0.0.1:5173") {
     "/demo/monitors/backup",
     "/demo/monitors/new",
     "/demo/incidents",
+    "/demo/deployments",
     "/demo/incidents/inc-search",
     "/demo/incidents/inc-api",
     "/demo/integrations",

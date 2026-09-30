@@ -6,20 +6,23 @@ The Workers share a D1 usage ledger and enforce capacity at the database layer. 
 
 ## Operating parameters
 
-| Parameter | Configuration |
-| --- | --- |
-| Scheduler | Every minute |
-| HTTP check interval | Five minutes minimum |
-| Active monitors | Five per workspace, ten across the deployment |
-| Status pages | One per workspace |
-| AI enrichment | Ten events per workspace per UTC day |
-| Incident chat | Twenty requests per workspace, forty per deployment per UTC day |
-| Chat history | Up to 100 questions per user/incident; latest 40 shown, latest four completed turns used as context |
-| Raw check history | Seven days |
-| Public snapshot TTL | 120 seconds |
-| History cache TTL | 45 seconds |
-| Retention cleanup | Up to 200 expired checks per hour |
-| Daily D1 project guard | 3,000,000 rows read / 60,000 rows written |
+| Parameter              | Configuration                                                                                       |
+| ---------------------- | --------------------------------------------------------------------------------------------------- |
+| Scheduler              | Every minute                                                                                        |
+| HTTP check interval    | Five minutes minimum                                                                                |
+| Active monitors        | Five per workspace, ten across the deployment                                                       |
+| Status pages           | One per workspace                                                                                   |
+| AI enrichment          | Ten events per workspace per UTC day                                                                |
+| Incident chat          | Twenty requests per workspace, forty per deployment per UTC day                                     |
+| Chat history           | Up to 100 questions per user/incident; latest 40 shown, latest four completed turns used as context |
+| Raw check history      | Seven days                                                                                          |
+| Public snapshot TTL    | 120 seconds                                                                                         |
+| History cache TTL      | 45 seconds                                                                                          |
+| Retention cleanup      | Up to 200 expired checks per hour                                                                   |
+| Deployment history     | Thirty days; at most 200 expired records removed per hour                                           |
+| Deployment query       | Twenty records per page, thirty-day time window                                                     |
+| Postmortem fields      | Four fields, 4,000 characters each; revision-checked saves                                          |
+| Daily D1 project guard | 3,000,000 rows read / 60,000 rows written                                                           |
 
 These values are configuration limits, not availability guarantees. Detection depends on the check interval, confirmation policy, and scheduler cadence.
 
@@ -36,6 +39,8 @@ The guard is not an exact account-wide billing counter. Concurrent work can over
 History queries use workspace, monitor, and timestamp predicates against composite indexes. Latest checks use indexed timestamp ordering; anomaly detection reads at most 20 samples. Cleanup selects expired rows through the time index rather than scanning all history.
 
 Checks older than seven days are unavailable through history endpoints. Physical deletion is incremental, so a cleanup backlog can take longer to clear.
+
+Deployment history follows the same bounded-cleanup approach with a thirty-day window. Recording a change does not schedule checks, enqueue alerts, or invoke AI. Public badge/RSS cache hits also bypass D1 accounting writes.
 
 ## Capacity changes
 

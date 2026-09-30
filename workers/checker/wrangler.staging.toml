@@ -1,0 +1,15 @@
+name = "pulseflare-checker-staging"
+account_id = "f456997005771d4af03fa8f845a54f62"
+main = "src/index.ts"
+compatibility_date = "2026-05-06"
+[[d1_databases]]
+binding = "DB"
+database_name = "pulseflare-staging"
+database_id = "8e037d00-3915-4b51-a594-d651fe07a357"
+[[queues.producers]]
+binding = "ALERT_QUEUE"
+queue = "pulseflare-staging-alerts"
+[[queues.producers]]
+binding = "INCIDENT_QUEUE"
+queue = "pulseflare-staging-incidents"
+# Scheduling is enabled only for a release test, then disabled to avoid idle work.

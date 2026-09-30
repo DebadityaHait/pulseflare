@@ -45,6 +45,7 @@ export interface Monitor {
   active: boolean;
   public: boolean;
   tags: string[];
+  environment?: "production" | "staging" | "development" | "unassigned";
   notifyDiscordWebhook?: string | null;
   notifyTelegramChatId?: string | null;
   notifyGenericWebhook?: string | null;

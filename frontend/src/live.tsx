@@ -16,6 +16,11 @@ import {
 import { api } from "./api/client";
 import { Badge, CopyButton, Empty } from "./components/ui";
 import { LatencyChart } from "./components/telemetry";
+import {
+  StatusDistribution,
+  DeploymentRows,
+  useDeployments,
+} from "./components/ProductTools";
 
 function useLive<T>(path: string, initial: T, poll = false) {
   const [data, setData] = useState(initial);
@@ -123,6 +128,8 @@ export type LiveMonitor = {
   heartbeatLastAt?: string | null;
   heartbeatDeadlineAt?: string | null;
   secretConfigured: boolean;
+  tags: string[];
+  environment: string;
 };
 type Evidence = {
   id: number;
@@ -159,6 +166,15 @@ export function MonitorEditor({
         name: String(f.get("name")),
         type,
         public: f.get("public") === "on",
+        tags: [
+          ...new Set(
+            String(f.get("tags") || "")
+              .split(",")
+              .map((t) => t.trim())
+              .filter(Boolean),
+          ),
+        ],
+        environment: f.get("environment"),
         ...(type === "heartbeat"
           ? {
               heartbeatExpectedS: Number(f.get("frequency")) * 60,
@@ -277,6 +293,32 @@ export function MonitorEditor({
               : "Heartbeat monitor"}
         </h2>
         <fieldset disabled={busy || !admin} className="plain-fieldset">
+          <div className="form-grid">
+            <label>
+              Environment
+              <select
+                name="environment"
+                aria-label="Environment"
+                defaultValue={existing?.environment || "unassigned"}
+              >
+                <option value="unassigned">Unassigned</option>
+                <option value="production">Production</option>
+                <option value="staging">Staging</option>
+                <option value="development">Development</option>
+              </select>
+            </label>
+            <label>
+              Tags
+              <input
+                name="tags"
+                aria-label="Tags"
+                maxLength={500}
+                defaultValue={existing?.tags?.join(", ")}
+                placeholder="critical, customer-facing"
+              />
+              <span className="form-hint">Comma-separated, up to 12 tags.</span>
+            </label>
+          </div>
           <label>
             Monitor name
             <input
@@ -500,6 +542,7 @@ export function MonitorEditor({
 
 export function LiveMonitorDetail() {
   const { id } = useParams();
+  const deployments = useDeployments(false, id);
   const navigate = useNavigate();
   const admin = useAdmin();
   const location = useLocation();
@@ -733,11 +776,13 @@ export function LiveMonitorDetail() {
           {checks.data.length ? (
             <div className="panel-chart">
               <LatencyChart
+                deployments={deployments.data.items}
                 data={checks.data
                   .slice()
                   .reverse()
                   .map((c) => ({
                     time: new Date(c.checked_at).toLocaleTimeString(),
+                    timestamp: Date.parse(c.checked_at),
                     latency: c.latency_ms,
                   }))}
               />
@@ -750,6 +795,25 @@ export function LiveMonitorDetail() {
           )}
         </section>
       )}
+      <section className="data-panel">
+        <div className="panel-heading">
+          <h2>Deployment annotations</h2>
+          <Link className="text-link" to="/dashboard/deployments">
+            Record a change
+          </Link>
+        </div>
+        {deployments.error ? (
+          <p className="product-state form-error" role="alert">
+            {deployments.error}
+          </p>
+        ) : deployments.data.items.length ? (
+          <DeploymentRows items={deployments.data.items} />
+        ) : (
+          <p className="product-state form-hint">
+            No deployments recorded for this monitor.
+          </p>
+        )}
+      </section>
       <section className="data-panel">
         <div className="panel-heading">
           <h2>
@@ -1206,6 +1270,7 @@ export function LiveStatusBuilder() {
         )}
       </Header>
       <State {...pages} />
+      {page?.published === 1 && <StatusDistribution slug={page.slug} />}
       {!pages.loading && !pages.error && (
         <form
           className="data-panel monitor-form"

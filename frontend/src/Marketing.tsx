@@ -278,19 +278,22 @@ export function FeaturesSection() {
           <Sparkles className="feature-icon" />
           <h3>Context when it counts.</h3>
           <p>
-            Turn check history into a useful starting point. AI-assisted
-            summaries help you investigate; the evidence stays in view.
+            Ask follow-up questions with Llama 3.3. Saved conversations and
+            inspectable evidence keep your investigation grounded.
           </p>
           <div className="ai-excerpt">
             <span>
-              <Sparkles size={13} /> Sample incident insight
+              <Sparkles size={13} /> Sample investigation
             </span>
             <p>
-              “Latency exceeded the configured threshold. Review the search
-              index and connection pool before rolling back.”
+              “The checks show elevated latency. Root cause is not confirmed.
+              Compare origin logs with the recorded deployment timeline.”
             </p>
-            <Link to="/demo/incidents/inc-search" className="text-link">
-              Follow the evidence <ArrowRight size={14} />
+            <Link
+              to="/demo/incidents/inc-search?tab=chat"
+              className="text-link"
+            >
+              Try incident chat <ArrowRight size={14} />
             </Link>
           </div>
         </Reveal>
@@ -462,7 +465,7 @@ export function PricingSection({
               "5-minute check intervals",
               "7-day raw check history",
               "1 public status page",
-              "AI-assisted incident summaries",
+              "AI summaries and private incident chat",
             ].map((t) => (
               <li key={t}>
                 <Check size={15} />
@@ -560,11 +563,11 @@ function FAQ() {
           ],
           [
             "Does monitoring depend on AI?",
-            "No. HTTP checks and incident detection run independently. AI is an optional layer that summarizes evidence and suggests where to investigate.",
+            "No. Checks and alerts run independently. Llama 3.3 helps you investigate with recorded evidence and saved follow-up context. Chat is private and has daily usage limits; it cannot change your services or publish updates.",
           ],
           [
             "Where does Pulseflare run?",
-            "Pulseflare runs on Cloudflare Pages and Workers, with D1 storing monitoring evidence, Queues delivering events, and Workers AI providing optional summaries. Clerk handles accounts and workspaces.",
+            "Pulseflare runs on Cloudflare Pages and Workers. D1 stores monitoring evidence and conversation memory, Queues deliver events, and Workers AI powers summaries and incident chat. Clerk handles accounts and workspaces.",
           ],
         ].map(([question, answer]) => (
           <details key={question}>
@@ -621,6 +624,40 @@ export function Footer() {
     </footer>
   );
 }
+function WorkflowFeatures() {
+  return (
+    <section className="container workflow-features">
+      <h2>Connect the rest of the workflow.</h2>
+      <div>
+        <article>
+          <GitBranch size={24} />
+          <h3>Changes in context</h3>
+          <p>
+            Record deployments from CI and see them beside response times.
+            Organize monitors by tags and environment.
+          </p>
+          <Link className="text-link" to="/demo/deployments">
+            Explore deployments <ArrowRight size={14} />
+          </Link>
+        </article>
+        <article>
+          <BookOpen size={24} />
+          <h3>Keep the lessons</h3>
+          <p>
+            Write private postmortems from recorded timelines. Save your
+            conclusions and export a Markdown report.
+          </p>
+          <Link className="text-link" to="/demo/incidents/inc-search">
+            Explore an incident <ArrowRight size={14} />
+          </Link>
+        </article>
+      </div>
+      <p>
+        Share published service health through status badges, JSON, and RSS.
+      </p>
+    </section>
+  );
+}
 export default function Marketing() {
   return (
     <>
@@ -629,6 +666,7 @@ export default function Marketing() {
         <Hero />
         <FeaturesSection />
         <StatusSection />
+        <WorkflowFeatures />
         <DeveloperSection />
         <PricingSection />
         <FAQ />
@@ -672,6 +710,7 @@ export function FeaturesPage() {
         </div>
         <FeaturesSection />
         <StatusSection />
+        <WorkflowFeatures />
       </main>
       <Footer />
     </>
@@ -710,7 +749,7 @@ export function ArchitecturePage() {
     {
       icon: Layers,
       title: "Cloudflare D1",
-      text: "Workspace configuration, check evidence, incident state, and durable event dispatch.",
+      text: "Workspace configuration, check evidence, deployment annotations, private reports, and conversation memory.",
     },
     {
       icon: GitBranch,
@@ -720,7 +759,7 @@ export function ArchitecturePage() {
     {
       icon: Sparkles,
       title: "Workers AI",
-      text: "Optional incident context with deterministic fallbacks.",
+      text: "Llama 3.3 incident chat with saved context, plus independent incident enrichment.",
     },
   ];
   return (
@@ -771,8 +810,8 @@ export function ArchitecturePage() {
             <p>
               Monitoring and notifications run independently of AI enrichment.
               Clerk provides workspace identity. Raw check history expires after
-              seven days. Faster scheduling and R2 archival are planned
-              improvements.
+              seven days. Private conversation memory stays separate from public
+              status updates.
             </p>
           </div>
         </div>
@@ -846,9 +885,10 @@ export function DocsPage() {
             <h2>From evidence to resolution</h2>
             <p>
               Inspect trigger checks, response times, notification deliveries,
-              and a timeline of updates. AI summaries offer investigation hints,
-              not a verified root cause. The demo includes a Markdown report
-              export with explicitly labeled sample evidence.
+              and a timeline of updates. Ask AI uses Llama 3.3 with saved
+              follow-up context and inspectable sources. Nearby deployments are
+              context, not proof of causation. Save a private postmortem and
+              export it as Markdown; unknown root causes stay unconfirmed.
             </p>
           </section>
           <section id="integrations">

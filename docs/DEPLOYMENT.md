@@ -41,3 +41,13 @@ Run `pnpm --filter frontend dev` in another terminal. Vite serves port 5173 and 
 Use a Clerk development instance for local testing. Configure a production instance and its Google OAuth credentials for a production deployment. Test-only loopback authentication bypass must remain disabled outside local development.
 
 The repository's Wrangler configurations target `pulseflare.zlv.uk`. Deployment IDs are environment-specific; verify the destination account before running deployment commands.
+
+## Staging and release verification
+
+The `wrangler.staging.toml` files target separate Workers, queues, Pages project, and D1 database. Apply all migrations to the isolated staging database, including `0006_product_tools.sql` for environments, deployments, and postmortems. Configure separate staging encryption secrets and explicitly authorize the staging origin in Clerk token validation.
+
+Run unit tests, type checks, the frontend build, browser regressions, and `node scripts/authenticated-smoke.mjs https://pulseflare-staging.pages.dev` before updating production. Enable the staging checker schedule only while testing scheduled flows, then disable it and remove test resources. Staging consumes the same account-level Cloudflare allowances; it is not a separate daily quota.
+
+Before production migration, record the D1 recovery bookmark and deployed Worker/Pages versions. Apply the additive migration, publish the API and checker, then the matching frontend. Preserve existing bindings and encryption secrets. Verify the production CSS content type, authenticated monitoring, reports, deployments, public feeds, and AI follow-up memory after rollout. Keep the previous bundles available for rollback.
+
+When uploading Pages assets through the API, obtain a fresh upload token from the destination project. Upload and register the asset hashes for that project before creating its deployment; a staging project's upload is not a production asset upload. Wait for the deployment stage to report success before running the smoke tests. If static assets fail, roll back Pages first and investigate the upload without changing application data.

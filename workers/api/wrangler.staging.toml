@@ -1,0 +1,24 @@
+name = "pulseflare-api-staging"
+account_id = "f456997005771d4af03fa8f845a54f62"
+main = "src/index.ts"
+compatibility_date = "2026-05-06"
+[vars]
+ALLOWED_ORIGIN = "https://pulseflare-staging.pages.dev"
+CLERK_AUTHORIZED_PARTIES = "https://pulseflare-staging.pages.dev"
+[[d1_databases]]
+binding = "DB"
+database_name = "pulseflare-staging"
+database_id = "8e037d00-3915-4b51-a594-d651fe07a357"
+migrations_dir = "../../migrations"
+[[queues.producers]]
+binding = "ALERT_QUEUE"
+queue = "pulseflare-staging-alerts"
+[[queues.producers]]
+binding = "INCIDENT_QUEUE"
+queue = "pulseflare-staging-incidents"
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 60, period = 60 }
+[ai]
+binding = "AI"

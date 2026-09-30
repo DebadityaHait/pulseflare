@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import { registerIncidentChat } from "./chat";
+import { registerProductTools, registerPublicFeeds } from "./product";
 import {
   BETA_ENTITLEMENTS,
   MAX_GLOBAL_ACTIVE_MONITORS,
@@ -95,6 +96,12 @@ export function requiredApiKeyScope(
   )
     return "incidents:read";
   if (method === "GET" && path === "/api/status-pages") return "status:read";
+  if (path === "/api/deployments")
+    return method === "GET"
+      ? "deployments:read"
+      : method === "POST"
+        ? "deployments:write"
+        : null;
   return null;
 }
 
@@ -207,6 +214,11 @@ function mapMonitor(row: DbRow): Monitor {
     active: asBool(row.active),
     public: asBool(row.public),
     tags: asArray(row.tags),
+    environment: value(
+      row,
+      "environment",
+      "unassigned",
+    ) as Monitor["environment"],
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };
@@ -549,6 +561,7 @@ app.use("*", async (c, next) => {
       "Content-Type",
       "X-Workspace-Id",
       "X-Turnstile-Token",
+      "Idempotency-Key",
     ],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   })(c, next);
@@ -629,7 +642,9 @@ app.use("/api/*", async (c, next) => {
   if (
     auth.role !== "admin" &&
     !["GET", "HEAD", "OPTIONS"].includes(c.req.method) &&
-    !/^\/api\/incidents\/[^/]+\/(acknowledge|update|resolve|chat)$/.test(c.req.path)
+    !/^\/api\/incidents\/[^/]+\/(acknowledge|update|resolve|chat|postmortem)$/.test(
+      c.req.path,
+    )
   )
     return fail("FORBIDDEN", "Workspace admin access is required", 403);
   if (!(await rateLimit(c, "api")))
@@ -878,8 +893,8 @@ app.post("/api/monitors", async (c) => {
     const encryptedHeaders = await createEncrypted(input.headers, c.env);
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 24);
     const row = await c.env.DB.prepare(
-      `INSERT INTO monitors (id, workspace_id, name, url, monitor_type, method, expected_status_min, expected_status_max, interval_s, timeout_ms, public, tags, headers_ciphertext, headers_iv, headers_version, request_body, expected_text, forbidden_text, json_path, latency_threshold_ms, heartbeat_expected_s, heartbeat_grace_s, heartbeat_secret_hash, heartbeat_secret_prefix, heartbeat_deadline_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO monitors (id, workspace_id, name, url, monitor_type, method, expected_status_min, expected_status_max, interval_s, timeout_ms, public, tags, environment, headers_ciphertext, headers_iv, headers_version, request_body, expected_text, forbidden_text, json_path, latency_threshold_ms, heartbeat_expected_s, heartbeat_grace_s, heartbeat_secret_hash, heartbeat_secret_prefix, heartbeat_deadline_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING *`,
     )
       .bind(
@@ -895,6 +910,7 @@ app.post("/api/monitors", async (c) => {
         input.timeoutMs,
         input.public ? 1 : 0,
         JSON.stringify(input.tags),
+        input.environment,
         encryptedHeaders?.ciphertext ?? null,
         encryptedHeaders?.iv ?? null,
         encryptedHeaders?.version ?? null,
@@ -975,12 +991,13 @@ app.patch("/api/monitors/:id", async (c) => {
       url: raw.url ?? current.url,
       type: raw.type ?? current.type ?? "http",
       method: raw.method ?? current.method,
-      intervalS: raw.intervalS ?? current.intervalS,
+      intervalS: raw.intervalS ?? Math.max(300, current.intervalS),
       timeoutMs: raw.timeoutMs ?? current.timeoutMs,
       expectedStatusMin: raw.expectedStatusMin ?? current.expectedStatusMin,
       expectedStatusMax: raw.expectedStatusMax ?? current.expectedStatusMax,
       public: raw.public ?? current.public,
       tags: raw.tags ?? current.tags,
+      environment: raw.environment ?? current.environment,
       headers: raw.headers,
       requestBody: raw.requestBody ?? existing.request_body ?? undefined,
       expectedText: raw.expectedText ?? current.expectedText ?? undefined,
@@ -1007,7 +1024,7 @@ app.patch("/api/monitors/:id", async (c) => {
       ? await createEncrypted(input.headers, c.env)
       : null;
     const row = await c.env.DB.prepare(
-      `UPDATE monitors SET name=?, url=?, monitor_type=?, method=?, expected_status_min=?, expected_status_max=?, interval_s=?, timeout_ms=?, public=?, tags=?, headers_ciphertext=COALESCE(?, headers_ciphertext), headers_iv=COALESCE(?, headers_iv), headers_version=COALESCE(?, headers_version), request_body=?, expected_text=?, forbidden_text=?, json_path=?, latency_threshold_ms=?, heartbeat_expected_s=?, heartbeat_grace_s=?, check_lease_token=NULL, check_lease_until=NULL, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id=? AND workspace_id=? RETURNING *`,
+      `UPDATE monitors SET name=?, url=?, monitor_type=?, method=?, expected_status_min=?, expected_status_max=?, interval_s=?, timeout_ms=?, public=?, tags=?, environment=?, headers_ciphertext=COALESCE(?, headers_ciphertext), headers_iv=COALESCE(?, headers_iv), headers_version=COALESCE(?, headers_version), request_body=?, expected_text=?, forbidden_text=?, json_path=?, latency_threshold_ms=?, heartbeat_expected_s=?, heartbeat_grace_s=?, check_lease_token=NULL, check_lease_until=NULL, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id=? AND workspace_id=? RETURNING *`,
     )
       .bind(
         input.name,
@@ -1020,6 +1037,7 @@ app.patch("/api/monitors/:id", async (c) => {
         input.timeoutMs,
         input.public ? 1 : 0,
         JSON.stringify(input.tags),
+        input.environment,
         encryptedHeaders?.ciphertext ?? null,
         encryptedHeaders?.iv ?? null,
         encryptedHeaders?.version ?? null,
@@ -1285,6 +1303,8 @@ app.get("/api/incidents/:id", async (c) => {
 });
 
 registerIncidentChat(app);
+registerProductTools(app);
+registerPublicFeeds(app, publicSnapshot);
 
 async function updateIncident(
   c: AppContext,

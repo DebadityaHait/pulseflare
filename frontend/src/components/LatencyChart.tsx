@@ -6,15 +6,29 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  ReferenceLine,
 } from "recharts";
 import { latencySeries } from "../data/demo";
 export default function LatencyChart({
   data = latencySeries(),
   compact = false,
+  deployments = [],
 }: {
-  data?: ReturnType<typeof latencySeries>;
+  data?: Array<{ time: string; latency: number; timestamp?: number }>;
   compact?: boolean;
+  deployments?: Array<{ id: string; version: string; createdAt: string }>;
 }) {
+  const timed = data.length > 0 && data.every((p) => p.timestamp !== undefined);
+  const times = data.map((p) => p.timestamp || 0);
+  const markers = timed
+    ? deployments
+        .filter(
+          (d) =>
+            Date.parse(d.createdAt) >= Math.min(...times) &&
+            Date.parse(d.createdAt) <= Math.max(...times),
+        )
+        .slice(0, 4)
+    : [];
   return (
     <div
       className={`latency-chart ${compact ? "compact-chart" : ""}`}
@@ -44,7 +58,18 @@ export default function LatencyChart({
             strokeDasharray="3 5"
           />
           <XAxis
-            dataKey="time"
+            dataKey={timed ? "timestamp" : "time"}
+            type={timed ? "number" : "category"}
+            domain={timed ? ["dataMin", "dataMax"] : undefined}
+            tickFormatter={
+              timed
+                ? (v) =>
+                    new Date(v).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                : undefined
+            }
             minTickGap={70}
             tick={{ fill: "var(--muted)", fontSize: 10 }}
             axisLine={false}
@@ -56,6 +81,9 @@ export default function LatencyChart({
             tickLine={false}
           />
           <Tooltip
+            labelFormatter={
+              timed ? (v) => new Date(Number(v)).toLocaleString() : undefined
+            }
             contentStyle={{
               background: "var(--panel)",
               border: "1px solid var(--line)",
@@ -64,6 +92,20 @@ export default function LatencyChart({
             }}
             formatter={(value: number) => [`${value} ms`, "Response"]}
           />
+          {markers.map((d) => (
+            <ReferenceLine
+              key={d.id}
+              x={Date.parse(d.createdAt)}
+              stroke="var(--accent)"
+              strokeDasharray="4 4"
+              label={{
+                value: d.version.slice(0, 12),
+                fill: "var(--accent-text)",
+                fontSize: 10,
+                position: "insideTopRight",
+              }}
+            />
+          ))}
           <Area
             dataKey="latency"
             type="monotone"

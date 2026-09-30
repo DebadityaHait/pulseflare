@@ -1,0 +1,8 @@
+name = "pulseflare-staging"
+account_id = "f456997005771d4af03fa8f845a54f62"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-05-06"
+[[services]]
+binding = "API"
+service = "pulseflare-api-staging"
+environment = "production"

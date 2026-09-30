@@ -40,6 +40,7 @@ beforeEach(() => {
     "0003_mvp.sql",
     "0004_free_tier_budget.sql",
     "0005_incident_chat.sql",
+    "0006_product_tools.sql",
   ])
     db.exec(
       readFileSync(new URL(`../migrations/${file}`, import.meta.url), "utf8"),

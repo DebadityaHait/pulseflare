@@ -1,0 +1,18 @@
+name = "pulseflare-ai-staging"
+account_id = "f456997005771d4af03fa8f845a54f62"
+main = "src/index.ts"
+compatibility_date = "2026-05-06"
+[[d1_databases]]
+binding = "DB"
+database_name = "pulseflare-staging"
+database_id = "8e037d00-3915-4b51-a594-d651fe07a357"
+[[queues.consumers]]
+queue = "pulseflare-staging-incidents"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 5
+[[queues.producers]]
+binding = "ALERT_QUEUE"
+queue = "pulseflare-staging-alerts"
+[ai]
+binding = "AI"

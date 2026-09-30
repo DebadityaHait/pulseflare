@@ -6,15 +6,15 @@ Pulseflare separates monitoring, notification delivery, and incident enrichment 
 
 ## Components
 
-| Component | Responsibility | Source |
-| --- | --- | --- |
-| Pages + React/Vite | Static assets, authenticated workspace, same-origin API service binding | [Frontend](../frontend/src/App.tsx), [Pages proxy](../frontend/public/_worker.js) |
-| API Worker + Hono | Authentication, workspace authorization, monitor configuration, heartbeat intake, incident updates, API keys, public status | [API](../workers/api/src/index.ts) |
-| Checker Worker + Cron | Scheduled checks, atomic leases, HTTP probes, heartbeat deadlines, retention, outbox dispatch | [Checker](../workers/checker/src/index.ts) |
-| D1 | Tenants, configuration, check evidence, incidents, leases, outbox, delivery records, daily usage | [Migrations](../migrations/) |
-| Alert queue + Worker | Provider-specific delivery, encrypted integration settings, records, retries | [Alert Worker](../workers/alert/src/index.ts) |
-| Incident queue + AI Worker | Workers AI summaries, advisory severity, validation, quotas, fallback | [AI Worker](../workers/ai/src/index.ts) |
-| Cache API | Public snapshots and history responses | [API](../workers/api/src/index.ts) |
+| Component                  | Responsibility                                                                                                              | Source                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Pages + React/Vite         | Static assets, authenticated workspace, same-origin API service binding                                                     | [Frontend](../frontend/src/App.tsx), [Pages proxy](../frontend/public/_worker.js) |
+| API Worker + Hono          | Authentication, workspace authorization, monitor configuration, heartbeat intake, incident updates, API keys, public status | [API](../workers/api/src/index.ts)                                                |
+| Checker Worker + Cron      | Scheduled checks, atomic leases, HTTP probes, heartbeat deadlines, retention, outbox dispatch                               | [Checker](../workers/checker/src/index.ts)                                        |
+| D1                         | Tenants, configuration, check evidence, incidents, leases, outbox, delivery records, daily usage                            | [Migrations](../migrations/)                                                      |
+| Alert queue + Worker       | Provider-specific delivery, encrypted integration settings, records, retries                                                | [Alert Worker](../workers/alert/src/index.ts)                                     |
+| Incident queue + AI Worker | Workers AI summaries, advisory severity, validation, quotas, fallback                                                       | [AI Worker](../workers/ai/src/index.ts)                                           |
+| Cache API                  | Public snapshots and history responses                                                                                      | [API](../workers/api/src/index.ts)                                                |
 
 ## Check lifecycle
 
@@ -61,16 +61,16 @@ The minute cron checks expired deadlines and opens missed-run incidents. A later
 
 ## Delivery and recovery
 
-| Condition | Handling |
-| --- | --- |
-| Timeout or assertion failure | Persist check evidence; consecutive failures confirm an outage |
-| Overlapping scheduled work | Atomic leases coordinate claims; expired leases allow recovery |
-| Failed queue handoff | Retain the outbox event and retry each handoff independently |
-| Duplicate alert message | Skip integrations with recorded successful delivery |
-| Provider failure | Record the failed attempt and retry through the queue |
-| Model failure or invalid output | Use validated deterministic fallback text and severity |
-| Database budget exhausted | Return retryable 503s, pause scheduled database work, retry queue messages |
-| Public cache hit | Return cached data without database reads or ledger writes |
+| Condition                       | Handling                                                                   |
+| ------------------------------- | -------------------------------------------------------------------------- |
+| Timeout or assertion failure    | Persist check evidence; consecutive failures confirm an outage             |
+| Overlapping scheduled work      | Atomic leases coordinate claims; expired leases allow recovery             |
+| Failed queue handoff            | Retain the outbox event and retry each handoff independently               |
+| Duplicate alert message         | Skip integrations with recorded successful delivery                        |
+| Provider failure                | Record the failed attempt and retry through the queue                      |
+| Model failure or invalid output | Use validated deterministic fallback text and severity                     |
+| Database budget exhausted       | Return retryable 503s, pause scheduled database work, retry queue messages |
+| Public cache hit                | Return cached data without database reads or ledger writes                 |
 
 External notifications use at-least-once delivery. A lost provider response can cause a repeat delivery even when internal processing is idempotent. Generic webhooks include event IDs and idempotency headers, with optional HMAC signatures so receivers can verify and deduplicate events.
 
@@ -85,6 +85,12 @@ HTTP request headers and notification integration settings use AES-GCM encryptio
 Target validation rejects private literal addresses, internal hostnames, and unsafe URL forms. Probes do not follow redirects. Validation is not a DNS-rebinding defense; configure endpoints you control. See [security tests](../tests/security.test.ts) and [authorization tests](../tests/api.test.ts).
 
 ## Database efficiency
+
+Deployment annotations use workspace-scoped records and composite foreign keys for monitor associations. Creation and audit logging share a D1 batch. A canonical payload and workspace-unique idempotency key make CI retries safe; reusing a key with a different payload returns a conflict. Time-bounded, indexed queries return at most 20 records per page. Hourly cleanup removes at most 200 records older than 30 days.
+
+Postmortems reference tenant-owned incidents. Deterministic drafts use recorded evidence and explicitly leave unconfirmed causes unresolved. Saves compare the report revision atomically, preventing silent overwrites between sessions. Export uses the saved revision. Neither reports nor deployment records are included in public snapshots, badges, or RSS.
+
+SVG badges and RSS share the public-page selection boundary and 120-second cache policy with JSON snapshots. RSS reads only updates explicitly marked public for selected public monitors; output is XML-escaped.
 
 History queries match composite indexes using workspace, monitor, and timestamp predicates. A regression fixture with 10,000 older checks exercises indexed history access. Anomaly detection reads at most 20 recent samples.
 

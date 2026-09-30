@@ -91,12 +91,8 @@ try {
       .locator('input[autocomplete="one-time-code"]')
       .first()
       .fill("424242");
-    if (
-      await page
-        .getByRole("button", { name: "Continue", exact: true })
-        .isVisible()
-    )
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
+    // Clerk submits a complete OTP automatically. Clicking Continue as well
+    // races that request and can invalidate the in-flight verification.
   }
   await page.getByLabel("Name", { exact: true }).waitFor();
   checks.push("Email/password signup and email verification");
@@ -128,6 +124,12 @@ try {
       .getByLabel("Endpoint URL", { exact: true })
       .fill("https://example.com");
     await page
+      .getByLabel("Environment", { exact: true })
+      .selectOption("production");
+    await page
+      .getByLabel("Tags", { exact: true })
+      .fill("critical, customer-facing");
+    await page
       .getByLabel("Allow this monitor on your public status page")
       .check();
     await page
@@ -144,6 +146,77 @@ try {
       page.getByText("HTTP 200", { exact: true }).first(),
     ).toBeVisible({ timeout: 30000 });
     checks.push("HTTP creation and real manual check");
+    await page.goto(`${origin}/dashboard/monitors`);
+    await page.getByLabel("Filter environment").selectOption("production");
+    await page.getByRole("button", { name: "critical", exact: true }).click();
+    await page.reload();
+    await expect(page.getByLabel("Filter environment")).toHaveValue(
+      "production",
+    );
+    await expect(
+      page.getByRole("button", { name: "critical", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(".monitor-row")).toHaveCount(1);
+    const tagged = (await api("/api/monitors")).find((m) => m.id === monitorId);
+    if (
+      tagged.environment !== "production" ||
+      !tagged.tags.includes("customer-facing")
+    )
+      throw new Error("Monitor labels did not persist");
+    checks.push("Monitor environments, tags and shareable filter reload");
+    await page.goto(`${origin}/dashboard/deployments`);
+    await page
+      .getByRole("button", { name: "Record deployment", exact: true })
+      .click();
+    await page.getByLabel("Version or commit").fill(`manual-${tag}`);
+    await page.getByLabel("Release test website", { exact: true }).check();
+    await page
+      .getByRole("button", { name: "Save deployment", exact: true })
+      .click();
+    await expect(
+      page.getByText(`manual-${tag}`, { exact: true }),
+    ).toBeVisible();
+    await page.reload();
+    await expect(
+      page.getByText(`manual-${tag}`, { exact: true }),
+    ).toBeVisible();
+    const ci = await api("/api/api-keys", "POST", {
+      name: "Release CI",
+      scopes: ["deployments:read", "deployments:write"],
+    });
+    const ciPayload = {
+      version: `ci-${tag}`,
+      environment: "production",
+      source: "github",
+      monitorIds: [monitorId],
+    };
+    async function ciRequest(path, method = "GET", body) {
+      return fetch(`${origin}${path}`, {
+        method,
+        headers: {
+          authorization: `Bearer ${ci.key}`,
+          "content-type": "application/json",
+          "Idempotency-Key": `release-${tag}`,
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+    }
+    const firstDeploy = await (
+      await ciRequest("/api/deployments", "POST", ciPayload)
+    ).json();
+    const retryDeploy = await (
+      await ciRequest("/api/deployments", "POST", ciPayload)
+    ).json();
+    if (!firstDeploy.ok || firstDeploy.data.id !== retryDeploy.data?.id)
+      throw new Error("CI deployment retry was not idempotent");
+    if ((await ciRequest("/api/monitors")).status !== 403)
+      throw new Error("CI key exceeded its scope");
+    await api(`/api/api-keys/${ci.id}`, "DELETE");
+    await page.goto(`${origin}/dashboard/monitors/${monitorId}`);
+    await expect(page.getByText(`ci-${tag}`, { exact: true })).toBeVisible();
+    checks.push(
+      "Manual deployments, monitor annotations and idempotent scoped CI API",
+    );
     await page.goto(`${origin}/dashboard/monitors/new`);
     await page.getByRole("button", { name: /Background job/ }).click();
     await page
@@ -188,6 +261,29 @@ try {
     )
       throw new Error("Public selection did not match");
     checks.push("Public status publication and privacy");
+    for (const [suffix, type] of [
+      ["/badge.svg", "image/svg+xml"],
+      ["/rss", "application/rss+xml"],
+    ]) {
+      const feed = await fetch(`${origin}/api/status/release-${tag}${suffix}`);
+      const text = await feed.text();
+      if (
+        !feed.ok ||
+        !feed.headers.get("content-type")?.includes(type) ||
+        text.includes(`ci-${tag}`) ||
+        text.includes("Release test backup")
+      )
+        throw new Error(
+          "Public distribution leaked private data or returned an invalid format",
+        );
+    }
+    await expect(
+      page.getByRole("heading", {
+        name: "Share your service health",
+        exact: true,
+      }),
+    ).toBeVisible();
+    checks.push("Published SVG badge, RSS and JSON privacy");
     const key = await api("/api/api-keys", "POST", {
       name: "Release test",
       scopes: ["monitors:read"],
@@ -222,6 +318,45 @@ try {
       throw new Error("Missed heartbeat did not open an incident");
     const incidentId = missed.find((i) => i.status !== "resolved").id;
     await page.goto(`${origin}/dashboard/incidents/${incidentId}`);
+    await page.getByRole("button", { name: "Postmortem", exact: true }).click();
+    await page
+      .getByLabel("Impact", { exact: true })
+      .fill("Private release-test impact. No customer traffic was involved.");
+    await page
+      .getByLabel("Root cause", { exact: true })
+      .fill("Intentionally missed test heartbeat.");
+    await page
+      .getByRole("button", { name: "Save report", exact: true })
+      .click();
+    await expect(
+      page.getByText("Report saved. It remains private to your workspace.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page.reload();
+    await page.getByRole("button", { name: "Postmortem", exact: true }).click();
+    await expect(page.getByLabel("Root cause", { exact: true })).toHaveValue(
+      "Intentionally missed test heartbeat.",
+    );
+    const exportEvent = page.waitForEvent("download");
+    await page
+      .getByRole("button", { name: "Export Markdown", exact: true })
+      .click();
+    const exportedReport = await exportEvent;
+    if (exportedReport.suggestedFilename() !== `pulseflare-${incidentId}.md`)
+      throw new Error("Saved report export failed");
+    const reportStream = await exportedReport.createReadStream();
+    let reportText = "";
+    for await (const chunk of reportStream) reportText += chunk.toString();
+    if (
+      !reportText.includes(
+        "\n## Root cause\nIntentionally missed test heartbeat.",
+      )
+    )
+      throw new Error("Export did not contain the saved Markdown report");
+    checks.push(
+      "Private editable postmortem, saved reload and Markdown export",
+    );
     await page.getByRole("button", { name: "Ask AI", exact: true }).click();
     await page
       .getByLabel("Your question", { exact: true })

@@ -18,6 +18,8 @@ beforeEach(() => {
     "0002_v2.sql",
     "0003_mvp.sql",
     "0004_free_tier_budget.sql",
+    "0005_incident_chat.sql",
+    "0006_product_tools.sql",
   ])
     sqlite.exec(
       readFileSync(new URL(`../migrations/${file}`, import.meta.url), "utf8"),

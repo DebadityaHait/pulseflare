@@ -55,6 +55,8 @@ beforeEach(() => {
   );
   db.exec(readFileSync(new URL('../migrations/0003_mvp.sql',import.meta.url),'utf8'));
   db.exec(readFileSync(new URL('../migrations/0004_free_tier_budget.sql',import.meta.url),'utf8'));
+  db.exec(readFileSync(new URL('../migrations/0005_incident_chat.sql',import.meta.url),'utf8'));
+  db.exec(readFileSync(new URL('../migrations/0006_product_tools.sql',import.meta.url),'utf8'));
   db.exec("INSERT INTO status_components(id,workspace_id,status_page_id,name) SELECT 'other-services','other',id,'Services' FROM status_pages WHERE slug='other'; INSERT INTO status_component_monitors(workspace_id,component_id,monitor_id) VALUES('other','other-services','visible')");
   env = { DB: d1(db), DEV_AUTH_BYPASS: "true" };
 });

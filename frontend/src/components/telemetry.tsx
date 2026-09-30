@@ -110,9 +110,11 @@ const DeferredChart = lazy(() => import("./LatencyChart"));
 export function LatencyChart({
   data = latencySeries(),
   compact = false,
+  deployments = [],
 }: {
-  data?: ReturnType<typeof latencySeries>;
+  data?: Array<{ time: string; latency: number; timestamp?: number }>;
   compact?: boolean;
+  deployments?: Array<{ id: string; version: string; createdAt: string }>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
@@ -142,7 +144,11 @@ export function LatencyChart({
             </div>
           }
         >
-          <DeferredChart data={data} compact={compact} />
+          <DeferredChart
+            data={data}
+            compact={compact}
+            deployments={deployments}
+          />
         </Suspense>
       )}
     </div>

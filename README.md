@@ -10,23 +10,29 @@ Monitor websites, APIs, and background jobs. Get notified when something breaks,
 
 ## Features
 
-| Feature | Details |
-| --- | --- |
-| HTTP monitoring | Scheduled GET, HEAD, and POST checks with status, text, and JSON-path assertions; configurable timeouts and encrypted request headers |
-| Job heartbeats | Monitor cron jobs and backups with secret ping URLs, grace periods, missed-run alerts, and automatic recovery |
-| Incident management | Confirmed outages, latency anomalies, evidence timelines, acknowledgement, resolution, and public incident updates |
-| Notifications | Slack, Discord, Telegram, and HTTPS webhooks with optional HMAC signing, test delivery, retries, and delivery logs |
-| AI-assisted investigation | Workers AI summaries and severity assessments backed by recorded check evidence; alerts run independently of enrichment |
-| Incident chat | Ask follow-up questions with Llama 3.3 on Workers AI; private D1 conversation memory and inspectable evidence sources |
-| Public status pages | Publish selected services, availability history, and incident updates through edge-cached pages |
-| Workspaces and access | Clerk authentication and organizations, Admin/Member roles, scoped API keys, and audit logs |
-| Monitoring dashboard | Response-time charts, searchable monitors, light and dark themes, and responsive layouts |
+| Feature                   | Details                                                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| HTTP monitoring           | Scheduled GET, HEAD, and POST checks with status, text, and JSON-path assertions; configurable timeouts and encrypted request headers |
+| Job heartbeats            | Monitor cron jobs and backups with secret ping URLs, grace periods, missed-run alerts, and automatic recovery                         |
+| Incident management       | Confirmed outages, latency anomalies, evidence timelines, acknowledgement, resolution, and public incident updates                    |
+| Notifications             | Slack, Discord, Telegram, and HTTPS webhooks with optional HMAC signing, test delivery, retries, and delivery logs                    |
+| AI-assisted investigation | Workers AI summaries and severity assessments backed by recorded check evidence; alerts run independently of enrichment               |
+| Incident chat             | Ask follow-up questions with Llama 3.3 on Workers AI; private D1 conversation memory and inspectable evidence sources                 |
+| Public status pages       | Publish selected services, availability history, and incident updates through edge-cached pages                                       |
+| Workspaces and access     | Clerk authentication and organizations, Admin/Member roles, scoped API keys, and audit logs                                           |
+| Monitoring dashboard      | Response-time charts, searchable monitors, light and dark themes, and responsive layouts                                              |
+| Monitor organization      | Production, staging, and development environments; multiple tags and URL-based filters                                                |
+| Deployment annotations    | Record changes manually or through scoped CI keys; correlate timestamps with latency and incidents without assuming causation         |
+| Postmortems               | Private, editable incident reports with recorded evidence, revision conflict protection, and Markdown export                          |
+| Status distribution       | Embeddable SVG badges, RSS incident updates, and JSON snapshots of selected public services                                           |
 
 ## Product tour
 
 [Explore the workspace](https://pulseflare.zlv.uk/demo) without signing in. The Orbit demo uses sample data; your own workspace connects to the monitoring service.
 
 Open an incident and select **Ask AI** to investigate with Llama 3.3. Conversations retain follow-up context and include inspectable sources from recorded monitoring evidence.
+
+Use **Deployments** to record a release against selected monitors. Its timestamps appear alongside monitoring evidence. The **Postmortem** tab turns an incident timeline into a private report you can edit, save, and export.
 
 ![Workspace overview with monitor health, incidents, and response-time trends](docs/screenshots/workspace.png)
 
@@ -40,6 +46,14 @@ Open an incident and select **Ask AI** to investigate with Llama 3.3. Conversati
 ### Incident investigation
 
 ![Incident evidence timeline and AI-assisted summary](docs/screenshots/incident.png)
+
+### Deployment history
+
+![Deployment history and CI integration](docs/screenshots/deployments.png)
+
+### Private postmortems
+
+![Incident report with evidence and Markdown export](docs/screenshots/postmortem.png)
 
 ### Public status page
 
@@ -83,6 +97,20 @@ The monitoring pipeline commits evidence, incident transitions, and outbox event
 
 Public cache hits bypass D1 entirely. Indexed history queries, bounded retention jobs, and a shared daily usage ledger keep database work predictable.
 
+## Deployment integration
+
+Create an API key with `deployments:write`. Submit a stable idempotency key for the same CI run so retries do not create duplicate annotations. Monitor IDs must belong to the key's workspace.
+
+```bash
+curl https://pulseflare.zlv.uk/api/deployments \
+  -H "Authorization: Bearer $PULSEFLARE_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -H "Idempotency-Key: deploy-$GITHUB_RUN_ID" \
+  --data '{"version":"a834fe2","environment":"production","source":"github","monitorIds":["YOUR_MONITOR_ID"]}'
+```
+
+Deployment records are annotations, not a command to deploy code or run probes. Reports and chat stay private; public feeds contain only selected public services and published incident updates.
+
 [Architecture and failure handling](docs/ARCHITECTURE.md) · [Operations](docs/OPERATIONS.md) · [Deployment](docs/DEPLOYMENT.md)
 
 ## Development
@@ -116,9 +144,9 @@ pnpm --filter frontend build
 pnpm test:browser
 ```
 
-The test suite covers monitor execution, heartbeat recovery, workspace isolation, API-key scopes, encryption, transactional dispatch, migration compatibility, database budgets, and incident chat. Chat tests exercise persisted follow-up context, tenant and user isolation, atomic quotas, idempotent requests, provider failures, and timeouts. Browser checks cover 24 routes at desktop and mobile widths, including themes, filters, navigation, and read-only interactions.
+The test suite covers monitor execution, heartbeat recovery, workspace isolation, API-key scopes, encryption, transactional dispatch, migration compatibility, database budgets, and incident chat. Chat tests exercise persisted follow-up context, tenant and user isolation, atomic quotas, idempotent requests, provider failures, and timeouts. Product tests cover deployment retries, report conflicts, retention, and public-feed privacy. Browser checks cover 25 routes at desktop and mobile widths, including themes, filters, navigation, and read-only interactions.
 
-Browser tests require Chrome and a frontend server on port 5173. [Authenticated end-to-end tests](scripts/authenticated-smoke.mjs) exercise signup, workspace creation, HTTP checks, scheduled heartbeat incidents, real Llama 3.3 responses, conversation persistence and follow-ups, public status publication, and API-key revocation.
+Browser tests require Chrome and a frontend server on port 5173. [Authenticated end-to-end tests](scripts/authenticated-smoke.mjs) exercise signup, workspace creation, HTTP checks, scheduled heartbeat incidents, real Llama 3.3 responses, conversation persistence and follow-ups, deployment recording, scoped CI retries, report editing/export, public feeds, and API-key revocation.
 
 ## Repository structure
 

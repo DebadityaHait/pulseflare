@@ -34,6 +34,9 @@ export async function runScheduled(env: Env) {
   }
   await flushOutbox(env);
   if (new Date().getUTCMinutes() === 0) {
+    await env.DB.prepare(
+      "DELETE FROM deployments WHERE id IN (SELECT id FROM deployments WHERE created_at<strftime('%Y-%m-%dT%H:%M:%SZ','now','-30 days') ORDER BY created_at,id LIMIT 200)",
+    ).run();
     // Budget deletion writes and seek the existing tenant/monitor/time index.
     // API reads hide expired evidence while the old prototype backlog ages out.
     const monitors = await env.DB.prepare(

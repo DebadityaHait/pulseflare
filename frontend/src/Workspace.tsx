@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Clock,
   Code2,
-  Download,
   ExternalLink,
   Globe,
   HeartPulse,
@@ -32,6 +31,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -44,9 +44,16 @@ import {
   useLocation,
   useNavigate,
   useParams,
+  useSearchParams,
 } from "react-router-dom";
 import { api } from "./api/client";
 import { IncidentChat } from "./components/IncidentChat";
+import {
+  Deployments,
+  Postmortem,
+  DeploymentRows,
+  useDeployments,
+} from "./components/ProductTools";
 import {
   LiveIntegrations,
   LiveStatusBuilder,
@@ -69,7 +76,6 @@ import {
   demoTimeline,
   timelineFor,
   latencySeries,
-  postmortemMarkdown,
 } from "./data/demo";
 
 const WorkspaceContext = createContext({ demo: true, base: "/demo" });
@@ -325,7 +331,10 @@ function Keys() {
         method: "POST",
         body: JSON.stringify({
           name: f.get("name"),
-          scopes: ["monitors:read", "incidents:read"],
+          scopes:
+            f.get("access") === "deployments"
+              ? ["deployments:read", "deployments:write"]
+              : ["monitors:read", "incidents:read"],
         }),
       });
       setKey(created.key);
@@ -366,8 +375,15 @@ function Keys() {
               placeholder="e.g. GitHub Actions"
             />
           </label>
+          <label>
+            Access
+            <select name="access">
+              <option value="read">Read-only monitoring</option>
+              <option value="deployments">Deployment pipeline</option>
+            </select>
+          </label>
           <button className="button primary small" disabled={busy}>
-            <Plus size={15} /> {busy ? "Creating…" : "Create read-only key"}
+            <Plus size={15} /> {busy ? "Creating…" : "Create key"}
           </button>
         </form>
         {error && <p className="form-error">{error}</p>}
@@ -772,6 +788,7 @@ type ApiMonitor = {
   active: boolean;
   intervalS: number;
   tags?: string[];
+  environment?: string;
   timeoutMs: number;
   uptime24h?: number | null;
   latestLatencyMs?: number | null;
@@ -788,7 +805,11 @@ function useMonitors() {
   return {
     ...result,
     monitors: demo
-      ? demoMonitors
+      ? demoMonitors.map((m) => ({
+          ...m,
+          tags: [m.tag],
+          environment: "production",
+        }))
       : result.data.map((m) => ({
           id: m.id,
           name: m.name,
@@ -798,6 +819,8 @@ function useMonitors() {
           active: m.active,
           intervalS: m.intervalS,
           tag: m.tags?.[0] || "default",
+          tags: m.tags || [],
+          environment: m.environment || "unassigned",
           uptime: m.uptime24h ?? 0,
           latency: m.latestLatencyMs ?? 0,
           uptimeKnown: m.uptime24h !== null && m.uptime24h !== undefined,
@@ -829,6 +852,7 @@ const navItems = [
   { to: "", label: "Overview", icon: LayoutDashboard },
   { to: "/monitors", label: "Monitors", icon: Activity },
   { to: "/incidents", label: "Incidents", icon: AlertCircle },
+  { to: "/deployments", label: "Deployments", icon: Code2 },
   { to: "/status-page", label: "Status page", icon: Globe },
   { to: "/integrations", label: "Integrations", icon: Webhook },
   { to: "/maintenance", label: "Maintenance", icon: Clock },
@@ -965,6 +989,7 @@ export default function Workspace({
               <Route path="usage" element={<Usage />} />
               <Route path="api-keys" element={<Keys />} />
               <Route path="maintenance" element={<Maintenance />} />
+              <Route path="deployments" element={<Deployments demo={demo} />} />
               <Route path="audit" element={<Audit />} />
               <Route path="settings" element={<WorkspaceSettings />} />
               <Route
@@ -1156,14 +1181,30 @@ function Overview() {
 function Monitors() {
   const { base, demo } = useWorkspace();
   const result = useMonitors();
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [params, setParams] = useSearchParams();
+  const pendingFilters = useRef(params);
+  useEffect(() => {
+    pendingFilters.current = params;
+  }, [params]);
+  const search = params.get("q") || "";
+  const filter = params.get("type") || "all";
+  const env = params.get("environment") || "all";
+  const tags = params.getAll("tag");
+  function change(key: string, value: string) {
+    const next = new URLSearchParams(pendingFilters.current);
+    if (!value || value === "all") next.delete(key);
+    else next.set(key, value);
+    pendingFilters.current = next;
+    setParams(next, { replace: true });
+  }
   const filtered = result.monitors.filter(
     (m) =>
-      `${m.name} ${m.url} ${m.tag}`
+      `${m.name} ${m.url} ${m.tags.join(" ")}`
         .toLowerCase()
         .includes(search.toLowerCase()) &&
-      (filter === "all" || m.type === filter || m.state === filter),
+      (filter === "all" || m.type === filter || m.state === filter) &&
+      (env === "all" || m.environment === env) &&
+      tags.every((t) => m.tags.includes(t)),
   );
   return (
     <>
@@ -1183,20 +1224,55 @@ function Monitors() {
             aria-label="Search monitors"
             placeholder="Search monitors…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => change("q", e.target.value)}
           />
         </label>
         <select
           aria-label="Filter monitors"
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
+          onChange={(e) => change("type", e.target.value)}
         >
           <option value="all">All monitors</option>
           <option value="http">HTTP endpoints</option>
           <option value="heartbeat">Heartbeats</option>
           <option value="degraded">Degraded</option>
         </select>
+        <select
+          aria-label="Filter environment"
+          value={env}
+          onChange={(e) => change("environment", e.target.value)}
+        >
+          <option value="all">All environments</option>
+          <option value="production">Production</option>
+          <option value="staging">Staging</option>
+          <option value="development">Development</option>
+          <option value="unassigned">Unassigned</option>
+        </select>
         <span>{filtered.length} monitors</span>
+      </div>
+      <div className="monitor-tag-filters" aria-label="Filter by tags">
+        {[...new Set([...result.monitors.flatMap((m) => m.tags), ...tags])]
+          .sort()
+          .map((tag) => (
+            <button
+              className={`button ghost small ${tags.includes(tag) ? "selected" : ""}`}
+              aria-pressed={tags.includes(tag)}
+              key={tag}
+              onClick={() => {
+                const next = new URLSearchParams(pendingFilters.current);
+                const current = next.getAll("tag");
+                const chosen = current.includes(tag)
+                  ? current.filter((t) => t !== tag)
+                  : [...current, tag];
+                next.delete("tag");
+                chosen.forEach((t) => next.append("tag", t));
+                pendingFilters.current = next;
+                setParams(next, { replace: true });
+              }}
+            >
+              {tag}
+            </button>
+          ))}
       </div>
       <ResourceState {...result} retry={result.reload}>
         <div className="data-panel">
@@ -1730,6 +1806,7 @@ function Incidents() {
 }
 function IncidentDetail() {
   const { id } = useParams();
+  const location = useLocation();
   const { base, demo } = useWorkspace();
   const sample = demoIncidents.find((i) => i.id === id);
   const result = useResource<{
@@ -1748,17 +1825,22 @@ function IncidentDetail() {
   });
   const notice = useNotice();
   const [tab, setTab] = useState("Timeline");
-  function exportReport() {
-    if (!sample) return;
-    const url = URL.createObjectURL(
-      new Blob([postmortemMarkdown(sample)], { type: "text/markdown" }),
+  const incidentStartedAt = Date.parse(result.data.incident?.started_at || "");
+  const incidentDeployments = useDeployments(
+    demo,
+    result.data.incident?.monitor_id,
+    Number.isFinite(incidentStartedAt)
+      ? new Date(incidentStartedAt - 3600000).toISOString()
+      : undefined,
+    result.data.incident?.resolved_at || undefined,
+  );
+  useEffect(() => {
+    setTab(
+      new URLSearchParams(location.search).get("tab") === "chat"
+        ? "Ask AI"
+        : "Timeline",
     );
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `pulseflare-${sample.id}-sample.md`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
+  }, [location.search, id]);
   async function update(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (demo)
@@ -1844,10 +1926,40 @@ function IncidentDetail() {
                 </button>
               ))}
             </div>
-            {tab === "Ask AI" ? (
-              <IncidentChat key={`${demo}:${id}`} incidentId={id || ""} demo={demo} />
+            {tab === "Postmortem" ? (
+              <Postmortem
+                key={`${demo}:${id}`}
+                incidentId={id || ""}
+                demo={demo}
+              />
+            ) : tab === "Ask AI" ? (
+              <IncidentChat
+                key={`${demo}:${id}`}
+                incidentId={id || ""}
+                demo={demo}
+              />
             ) : tab === "Timeline" ? (
               <section className="data-panel timeline-panel">
+                <div className="recent-deployments">
+                  <h3>Recent changes</h3>
+                  <p className="form-hint">
+                    Nearby deployments are context, not proof of root cause.
+                  </p>
+                  {incidentDeployments.error ? (
+                    <p className="form-error" role="alert">
+                      {incidentDeployments.error}
+                    </p>
+                  ) : incidentDeployments.loading ? (
+                    <p role="status">Loading changes...</p>
+                  ) : incidentDeployments.data.items.length ? (
+                    <DeploymentRows items={incidentDeployments.data.items} />
+                  ) : (
+                    <p className="form-hint">
+                      No deployments recorded for this monitor near the
+                      incident.
+                    </p>
+                  )}
+                </div>
                 {demo
                   ? timelineFor(id || "").map((t, index) => (
                       <div className="timeline-event" key={t.time}>
@@ -1953,35 +2065,7 @@ function IncidentDetail() {
                       </div>
                     ))}
               </section>
-            ) : (
-              <section className="data-panel report-panel">
-                <div className="panel-heading">
-                  <h2>Incident report</h2>
-                  {demo && (
-                    <button
-                      className="button secondary small"
-                      onClick={exportReport}
-                    >
-                      <Download size={14} /> Export Markdown
-                    </button>
-                  )}
-                </div>
-                <h3>What happened</h3>
-                <p>{result.data.incident.ai_summary}</p>
-                <h3>Root cause</h3>
-                <p>
-                  Not yet confirmed. Review the evidence and record the
-                  confirmed cause before publishing.
-                </p>
-                <h3>Follow-up actions</h3>
-                <ul>
-                  <li>Review deployment changes and origin logs.</li>
-                  <li>Validate recovery with subsequent checks.</li>
-                  <li>Document preventive actions with the team.</li>
-                </ul>
-                {!demo && <p>Editable reports are coming soon.</p>}
-              </section>
-            )}
+            ) : null}
           </>
         ) : (
           <Empty
