@@ -74,7 +74,7 @@ Google account consent was not completed by the automated test; it verified the 
 - Created a fresh database and applied/recorded migrations 0001 through 0004.
   Schema application consumed 1,836 reads / 186 writes, without raw-history import.
   Original monitors and historical data remain in the original account.
-- Passed 72 backend tests, all six package typechecks, the frontend build, and
+- Passed 73 backend tests, all six package typechecks, the frontend build, and
   Worker deployment dry runs. Indexed-query regression tests include 10,000 old
   local checks; budget tests verify metering, UTC rollover and retryable 503s.
 - Passed 72 deployed route/viewport checks at 1440, 390 and 360 px, with pricing,

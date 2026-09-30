@@ -26,9 +26,31 @@ beforeEach(() => {
 afterEach(() => {
   sqlite.close();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe("shared daily database budget", () => {
+  it("serves cached public status without any D1 read or accounting write", async () => {
+    vi.stubGlobal("caches", {
+      open: async () => ({
+        match: async () =>
+          Response.json(
+            { ok: true, data: { overallState: "operational" } },
+            { headers: { "cache-control": "public, max-age=120" } },
+          ),
+      }),
+    });
+    const prepare = vi.fn(() => {
+      throw new Error("Cache hit must not query D1");
+    });
+    const result = await api.request(
+      "https://pulseflare.zlv.uk/api/status/service",
+      {},
+      { DB: { prepare } as unknown as D1Database },
+    );
+    expect(result.status).toBe(200);
+    expect(prepare).not.toHaveBeenCalled();
+  });
   it("meters first/all/run/batch metadata and flushes once", async () => {
     const db = d1(sqlite);
     const prepare = db.prepare.bind(db);

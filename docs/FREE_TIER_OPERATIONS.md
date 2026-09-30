@@ -34,7 +34,9 @@ HTTP requests or rows returned. See [D1 pricing](https://developers.cloudflare.c
   composite index seeks the relevant time range. Latest checks use indexed
   timestamp ordering, and anomaly detection reads at most 20 recent samples.
 - Public snapshots cache for 120 seconds. The incident endpoint reuses the
-  snapshot. Raw history is hidden beyond seven days; physical cleanup selects
+  snapshot. Public edge-cache hits bypass D1 entirely, including ledger writes;
+  history responses also use the edge cache with their 45-second TTL.
+  Raw history is hidden beyond seven days; physical cleanup selects
   at most 200 expired checks per hour through the same time index.
 - Queue consumers run with concurrency one. Only incident transitions create
   queue work. Completed outbox entries do not participate in pending scans.

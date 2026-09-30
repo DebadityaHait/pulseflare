@@ -561,6 +561,20 @@ app.use(
 );
 app.use("/api/*", async (c, next) => {
   if (c.req.path === "/api/health" || c.req.method === "OPTIONS") return next();
+  // Serve public edge-cache hits before D1 accounting. Otherwise every cached
+  // visitor still writes to the budget ledger and wastes the write allowance.
+  const publicStatus =
+    c.req.method === "GET" &&
+    (c.req.path === "/api/status" || c.req.path.startsWith("/api/status/"));
+  const cache =
+    publicStatus && typeof caches !== "undefined"
+      ? await caches.open("pulseflare-public-budget-v1")
+      : undefined;
+  const cacheKey = new Request(
+    `${new URL(c.req.url).origin}/__public-cache${c.req.path}`,
+  );
+  const cached = await cache?.match(cacheKey);
+  if (cached) return cached;
   const budget = await databaseBudget(c.env.DB);
   c.env = { ...c.env, DB: budget.DB };
   try {
@@ -568,6 +582,7 @@ app.use("/api/*", async (c, next) => {
   } finally {
     await budget.finish();
   }
+  if (cache && c.res.ok) await cache.put(cacheKey, c.res.clone());
 });
 app.use("/api/*", async (c, next) => {
   if (
