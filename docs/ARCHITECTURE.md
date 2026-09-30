@@ -34,7 +34,7 @@ sequenceDiagram
   Cron->>Checker: Run scheduled work
   Checker->>DB: Atomically claim a due monitor lease
   DB-->>Checker: Claimed monitor
-  Checker->>Target: Bounded probe; redirects disabled
+  Checker->>Target: Bounded probe, redirects disabled
   Target-->>Checker: Status / assertion evidence / latency
   Checker->>DB: Batch check + state transition + outbox event
   Note over Checker,DB: Two consecutive failures confirm an outage
