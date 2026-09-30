@@ -220,6 +220,50 @@ try {
     const missed = await api(`/api/monitors/${heartbeatId}/incidents`);
     if (!missed.some((i) => i.status !== "resolved"))
       throw new Error("Missed heartbeat did not open an incident");
+    const incidentId = missed.find((i) => i.status !== "resolved").id;
+    await page.goto(`${origin}/dashboard/incidents/${incidentId}`);
+    await page.getByRole("button", { name: "Ask AI", exact: true }).click();
+    await page
+      .getByLabel("Your question", { exact: true })
+      .fill("What does the evidence show about this missed heartbeat?");
+    await page
+      .getByRole("button", { name: "Send question", exact: true })
+      .click();
+    await expect(
+      page.locator(".chat-turn .chat-message.assistant"),
+    ).toHaveCount(1, { timeout: 40000 });
+    await expect(page.locator(".chat-sources")).toHaveCount(1, {
+      timeout: 40000,
+    });
+    const firstChat = await api(`/api/incidents/${incidentId}/chat`);
+    if (
+      firstChat.turns.length !== 1 ||
+      firstChat.turns[0].status !== "complete" ||
+      !firstChat.turns[0].answer ||
+      !firstChat.model.includes("llama-3.3")
+    )
+      throw new Error("Real Llama 3.3 conversation was not saved");
+    await page.reload();
+    await page.getByRole("button", { name: "Ask AI", exact: true }).click();
+    await expect(page.locator(".chat-sources")).toHaveCount(1);
+    await page
+      .getByLabel("Your question", { exact: true })
+      .fill("Following up on my previous question, what should I check next?");
+    await page
+      .getByRole("button", { name: "Send question", exact: true })
+      .click();
+    await expect(page.locator(".chat-sources")).toHaveCount(2, {
+      timeout: 40000,
+    });
+    const followupChat = await api(`/api/incidents/${incidentId}/chat`);
+    if (
+      followupChat.turns.length !== 2 ||
+      followupChat.turns[1].status !== "complete"
+    )
+      throw new Error("Follow-up chat was not persisted");
+    checks.push(
+      "Real Llama 3.3 incident chat, D1 memory, reload and follow-up",
+    );
     if (!(await fetch(heartbeatUrl, { method: "POST" })).ok)
       throw new Error("Heartbeat recovery ping failed");
     const recovered = await api(`/api/monitors/${heartbeatId}/incidents`);

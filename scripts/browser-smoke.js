@@ -90,6 +90,20 @@ export default async function smoke(page, origin = "http://127.0.0.1:5173") {
   await page.getByRole("dialog").waitFor();
   await page.keyboard.press("Escape");
   await page.goto(`${origin}/demo/incidents/inc-search`);
+  await page.getByRole("button", { name: "Ask AI", exact: true }).click();
+  await page
+    .getByRole("heading", { name: "Ask about this incident" })
+    .waitFor();
+  check(
+    await page.getByText("This sample conversation is read-only.").isVisible(),
+    "Chat demo must be explicitly read-only",
+  );
+  check(
+    await page
+      .getByRole("link", { name: "Ask about your incidents" })
+      .isVisible(),
+    "Chat demo must link to the real workspace signup",
+  );
   await page.getByRole("button", { name: "Postmortem", exact: true }).click();
   const pendingDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Markdown" }).click();

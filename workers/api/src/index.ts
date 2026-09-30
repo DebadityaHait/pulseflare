@@ -3,6 +3,7 @@ import { Hono, type Context, type Next } from "hono";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
+import { registerIncidentChat } from "./chat";
 import {
   BETA_ENTITLEMENTS,
   MAX_GLOBAL_ACTIVE_MONITORS,
@@ -35,6 +36,7 @@ import {
 
 export interface Env {
   DB: D1Database;
+  AI?: Ai;
   STATUS_KV?: KVNamespace;
   ALERT_QUEUE?: Queue<AlertQueueEvent>;
   INCIDENT_QUEUE?: Queue<IncidentQueueEvent>;
@@ -53,7 +55,7 @@ export interface Env {
   };
 }
 
-type AuthContext = {
+export type AuthContext = {
   userId: string;
   clerkOrgId: string;
   workspaceId: string;
@@ -627,7 +629,7 @@ app.use("/api/*", async (c, next) => {
   if (
     auth.role !== "admin" &&
     !["GET", "HEAD", "OPTIONS"].includes(c.req.method) &&
-    !/^\/api\/incidents\/[^/]+\/(acknowledge|update|resolve)$/.test(c.req.path)
+    !/^\/api\/incidents\/[^/]+\/(acknowledge|update|resolve|chat)$/.test(c.req.path)
   )
     return fail("FORBIDDEN", "Workspace admin access is required", 403);
   if (!(await rateLimit(c, "api")))
@@ -1281,6 +1283,8 @@ app.get("/api/incidents/:id", async (c) => {
     }),
   );
 });
+
+registerIncidentChat(app);
 
 async function updateIncident(
   c: AppContext,

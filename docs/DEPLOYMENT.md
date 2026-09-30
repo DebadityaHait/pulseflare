@@ -34,9 +34,9 @@ Run `pnpm --filter frontend dev` in another terminal. Vite serves port 5173 and 
 1. Replace account IDs, database IDs, and allowed origins in the Wrangler configurations with your own values.
 2. Provision the `pulseflare` D1 database and the `incident-events` and `alert-events` queues. Apply the numbered migrations from `migrations/`; do not seed a populated database.
 3. Configure the API's Clerk credentials, authorized origins, and encryption key with Wrangler secrets. Configure the same encryption key on checker and alert.
-4. Deploy the API, alert consumer, AI consumer, and checker using their package deployment scripts. The checker configuration includes the minute Cron Trigger; the AI Worker binds Workers AI.
+4. Deploy the API, alert consumer, AI consumer, and checker using their package deployment scripts. The checker configuration includes the minute Cron Trigger; both the API (incident chat) and AI Worker (automatic enrichment) bind Workers AI. Incident chat requires migration `0005_incident_chat.sql`.
 5. Build the frontend and publish it to Pages. Configure the `API` service binding to `pulseflare-api`, preserve the API-only `_routes.json`, and configure the custom domain and Clerk redirect origins.
-6. Verify sign-in and workspace creation, an HTTP check, heartbeat deadline/recovery, notification dispatch, public-page selection, and API-key revocation.
+6. Verify sign-in and workspace creation, an HTTP check, heartbeat deadline/recovery, incident chat and saved follow-up context, notification dispatch, public-page selection, and API-key revocation. Check that the deployed stylesheet loads as `text/css`, including requests with the site's `Origin` header; purge the specific asset URL and its Origin cache variant if an older SPA fallback was cached during deployment.
 
 Use a Clerk development instance for local testing. Configure a production instance and its Google OAuth credentials for a production deployment. Test-only loopback authentication bypass must remain disabled outside local development.
 

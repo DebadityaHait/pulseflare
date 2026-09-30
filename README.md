@@ -17,6 +17,7 @@ Monitor websites, APIs, and background jobs. Get notified when something breaks,
 | Incident management | Confirmed outages, latency anomalies, evidence timelines, acknowledgement, resolution, and public incident updates |
 | Notifications | Slack, Discord, Telegram, and HTTPS webhooks with optional HMAC signing, test delivery, retries, and delivery logs |
 | AI-assisted investigation | Workers AI summaries and severity assessments backed by recorded check evidence; alerts run independently of enrichment |
+| Incident chat | Ask follow-up questions with Llama 3.3 on Workers AI; private D1 conversation memory and inspectable evidence sources |
 | Public status pages | Publish selected services, availability history, and incident updates through edge-cached pages |
 | Workspaces and access | Clerk authentication and organizations, Admin/Member roles, scoped API keys, and audit logs |
 | Monitoring dashboard | Response-time charts, searchable monitors, light and dark themes, and responsive layouts |
@@ -24,6 +25,8 @@ Monitor websites, APIs, and background jobs. Get notified when something breaks,
 ## Product tour
 
 [Explore the workspace](https://pulseflare.zlv.uk/demo) without signing in. The Orbit demo uses sample data; your own workspace connects to the monitoring service.
+
+Open an incident and select **Ask AI** to investigate with Llama 3.3. Conversations retain follow-up context and include inspectable sources from recorded monitoring evidence.
 
 ![Workspace overview with monitor health, incidents, and response-time trends](docs/screenshots/workspace.png)
 
@@ -58,6 +61,7 @@ flowchart TB
   Pages -->|"static assets"| Static["Website + demo"]
   Pages -->|"/api service binding"| API["Hono API Worker"]
   Clerk["Clerk authentication"] -.-> API
+  API -->|"incident chat"| WAI
   Jobs["Background jobs"] -->|"heartbeat ping"| API
   API --> D1[("D1")]
   Cron["Cron Trigger"] --> Checker["Checker Worker"]
@@ -112,9 +116,9 @@ pnpm --filter frontend build
 pnpm test:browser
 ```
 
-The suite contains 73 tests covering monitor execution, heartbeat recovery, workspace isolation, API-key scopes, encryption, transactional dispatch, migration compatibility, and database budgets. Browser checks cover 24 routes at desktop and mobile widths, including themes, filters, navigation, and read-only interactions.
+The test suite covers monitor execution, heartbeat recovery, workspace isolation, API-key scopes, encryption, transactional dispatch, migration compatibility, database budgets, and incident chat. Chat tests exercise persisted follow-up context, tenant and user isolation, atomic quotas, idempotent requests, provider failures, and timeouts. Browser checks cover 24 routes at desktop and mobile widths, including themes, filters, navigation, and read-only interactions.
 
-Browser tests require Chrome and a frontend server on port 5173. [Authenticated end-to-end tests](scripts/authenticated-smoke.mjs) exercise signup, workspace creation, HTTP checks, scheduled heartbeat incidents, public status publication, and API-key revocation.
+Browser tests require Chrome and a frontend server on port 5173. [Authenticated end-to-end tests](scripts/authenticated-smoke.mjs) exercise signup, workspace creation, HTTP checks, scheduled heartbeat incidents, real Llama 3.3 responses, conversation persistence and follow-ups, public status publication, and API-key revocation.
 
 ## Repository structure
 

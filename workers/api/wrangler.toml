@@ -25,3 +25,6 @@ queue = "alert-events"
 [[queues.producers]]
 binding = "INCIDENT_QUEUE"
 queue = "incident-events"
+
+[ai]
+binding = "AI"

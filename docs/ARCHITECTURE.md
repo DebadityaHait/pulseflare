@@ -76,6 +76,8 @@ External notifications use at-least-once delivery. A lost provider response can 
 
 ## Access and secrets
 
+Incident chat runs through the authenticated API Worker using Llama 3.3 on Workers AI. D1 stores private conversation turns, evidence snapshots, and atomic request reservations. Follow-up prompts include a bounded window of the user's previous answers and only server-selected incident/check evidence, never request headers, integration credentials, or arbitrary client-provided context. Model output is advisory and cannot execute actions. Daily workspace and platform caps apply even to failed inference attempts. Answers include evidence identifiers and an inspectable source list.
+
 Clerk authenticates users and organizations. The API resolves workspace membership and Admin/Member permissions, and binds workspace IDs in resource queries. Scoped API keys are hashed, revocable, and denied unless their stored scopes permit the operation.
 
 HTTP request headers and notification integration settings use AES-GCM encryption. The shared encryption key lives in Worker secrets. Public snapshots include selected public monitors and published updates; private AI investigation notes stay within the workspace.

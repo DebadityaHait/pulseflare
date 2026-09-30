@@ -13,6 +13,8 @@ The Workers share a D1 usage ledger and enforce capacity at the database layer. 
 | Active monitors | Five per workspace, ten across the deployment |
 | Status pages | One per workspace |
 | AI enrichment | Ten events per workspace per UTC day |
+| Incident chat | Twenty requests per workspace, forty per deployment per UTC day |
+| Chat history | Up to 100 questions per user/incident; latest 40 shown, latest four completed turns used as context |
 | Raw check history | Seven days |
 | Public snapshot TTL | 120 seconds |
 | History cache TTL | 45 seconds |

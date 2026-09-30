@@ -46,6 +46,7 @@ import {
   useParams,
 } from "react-router-dom";
 import { api } from "./api/client";
+import { IncidentChat } from "./components/IncidentChat";
 import {
   LiveIntegrations,
   LiveStatusBuilder,
@@ -1833,7 +1834,7 @@ function IncidentDetail() {
               </section>
             </div>
             <div className="detail-tabs">
-              {["Timeline", "Deliveries", "Postmortem"].map((t) => (
+              {["Timeline", "Ask AI", "Deliveries", "Postmortem"].map((t) => (
                 <button
                   key={t}
                   className={t === tab ? "active" : ""}
@@ -1843,7 +1844,9 @@ function IncidentDetail() {
                 </button>
               ))}
             </div>
-            {tab === "Timeline" ? (
+            {tab === "Ask AI" ? (
+              <IncidentChat key={`${demo}:${id}`} incidentId={id || ""} demo={demo} />
+            ) : tab === "Timeline" ? (
               <section className="data-panel timeline-panel">
                 {demo
                   ? timelineFor(id || "").map((t, index) => (
