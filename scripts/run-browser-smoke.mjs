@@ -8,7 +8,7 @@ try {
   const context = await browser.newContext();
   const page = await context.newPage();
   page.setDefaultTimeout(15000);
-  await smoke(page);
+  await smoke(page, process.argv[2]);
 } finally {
   await browser.close();
 }

@@ -2,6 +2,9 @@ import {
   decryptSecret,
   isValidMonitorUrl,
   signWebhook,
+  databaseBudget,
+  databaseRetryDelay,
+  isDatabaseLimit,
   type AlertQueueEvent,
 } from "@pulseflare/shared";
 export interface Env {
@@ -180,13 +183,29 @@ export async function routeAlert(env: Env, event: AlertQueueEvent) {
 }
 export default {
   async queue(batch: MessageBatch<AlertQueueEvent>, env: Env) {
-    for (const message of batch.messages) {
-      try {
-        await routeAlert(env, message.body);
-        message.ack();
-      } catch {
-        message.retry({ delaySeconds: 60 });
+    let budget: Awaited<ReturnType<typeof databaseBudget>>;
+    try {
+      budget = await databaseBudget(env.DB);
+    } catch (error) {
+      if (!isDatabaseLimit(error)) throw error;
+      batch.messages.forEach((message) =>
+        message.retry({ delaySeconds: databaseRetryDelay() }),
+      );
+      return;
+    }
+    try {
+      for (const message of batch.messages) {
+        try {
+          await routeAlert({ ...env, DB: budget.DB }, message.body);
+          message.ack();
+        } catch (error) {
+          message.retry({
+            delaySeconds: isDatabaseLimit(error) ? databaseRetryDelay() : 60,
+          });
+        }
       }
+    } finally {
+      await budget.finish();
     }
   },
 };

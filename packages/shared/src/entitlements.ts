@@ -1,6 +1,6 @@
 import type { Entitlements } from "./types";
 
-export const MAX_GLOBAL_ACTIVE_MONITORS = 100;
+export const MAX_GLOBAL_ACTIVE_MONITORS = 10;
 export const MAX_AI_EVENTS_PER_WORKSPACE_PER_DAY = 10;
 
 export const BETA_ENTITLEMENTS: Entitlements = {

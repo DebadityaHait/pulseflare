@@ -23,7 +23,8 @@ import {
   runHttpMonitor,
   flushOutbox,
   incidentOutbox,
-  uptimePercent,
+  databaseBudget,
+  isDatabaseLimit,
   type AlertQueueEvent,
   type Entitlements,
   type IncidentQueueEvent,
@@ -124,6 +125,17 @@ function asArray(input: unknown): string[] {
   } catch {
     return [];
   }
+}
+
+// Constrain both leading index columns before the timestamp range. A workspace-
+// only aggregate otherwise scans all retained prototype history on every read.
+const recentMetricsSql = `(SELECT json_object('count',COUNT(*),'success',COALESCE(SUM(ok),0),'latency',COALESCE(AVG(latency_ms),0)) FROM checks WHERE workspace_id=m.workspace_id AND monitor_id=m.id AND checked_at>=strftime('%Y-%m-%dT%H:%M:%SZ','now','-1 day'))`;
+function recentMetrics(row: DbRow) {
+  return JSON.parse(String(row.metrics ?? "{}")) as {
+    count: number;
+    success: number;
+    latency: number;
+  };
 }
 
 function parseJson(c: AppContext): Promise<unknown> {
@@ -350,6 +362,7 @@ async function authenticate(c: AppContext): Promise<AuthContext | null> {
       via: "clerk",
     };
   } catch (error) {
+    if (isDatabaseLimit(error)) throw error;
     console.log(
       JSON.stringify({
         level: "warn",
@@ -466,17 +479,11 @@ async function publicSnapshot(env: Env, slug: string) {
   if (!page) return null;
   const workspaceId = String(page.workspace_id);
   const monitorRows = await env.DB.prepare(
-    `SELECT m.id, m.name, m.last_state, m.last_checked_at, m.last_check_id, m.public,
-      COALESCE(h.checks, 0) AS checks_24h, COALESCE(h.successful_checks, 0) AS successful_24h,
-      COALESCE(h.avg_latency, 0) AS avg_latency_24h
+    `SELECT m.id, m.name, m.last_state, m.last_checked_at, m.last_check_id, m.public,${recentMetricsSql} AS metrics
      FROM monitors m
-     LEFT JOIN (
-       SELECT monitor_id, COUNT(*) AS checks, SUM(ok) AS successful_checks, AVG(latency_ms) AS avg_latency
-       FROM checks WHERE workspace_id = ? AND julianday(checked_at) >= julianday('now', '-1 day') GROUP BY monitor_id
-     ) h ON h.monitor_id = m.id
      WHERE m.workspace_id = ? AND m.active = 1 AND m.public = 1 AND EXISTS(SELECT 1 FROM status_component_monitors scm JOIN status_components sc ON sc.id=scm.component_id AND sc.workspace_id=scm.workspace_id WHERE scm.monitor_id=m.id AND scm.workspace_id=m.workspace_id AND sc.status_page_id=?) ORDER BY m.name ASC`,
   )
-    .bind(workspaceId, workspaceId, page.id)
+    .bind(workspaceId, page.id)
     .all<DbRow>();
   const incidents = await env.DB.prepare(
     `SELECT i.id, i.monitor_id, m.name AS monitor_name, i.status, i.started_at, i.resolved_at,
@@ -497,10 +504,10 @@ async function publicSnapshot(env: Env, slug: string) {
     name: String(row.name),
     state: String(row.last_state ?? "unknown"),
     status: 0,
-    latencyMs: Math.round(Number(row.avg_latency_24h ?? 0)),
-    uptime24h: row.checks_24h
+    latencyMs: Math.round(recentMetrics(row).latency),
+    uptime24h: recentMetrics(row).count
       ? Math.round(
-          (Number(row.successful_24h) / Number(row.checks_24h)) * 10000,
+          (recentMetrics(row).success / recentMetrics(row).count) * 10000,
         ) / 100
       : null,
     checkedAt: row.last_checked_at ? String(row.last_checked_at) : null,
@@ -552,6 +559,16 @@ app.use(
     onError: () => fail("BODY_TOO_LARGE", "Request body is too large", 413),
   }),
 );
+app.use("/api/*", async (c, next) => {
+  if (c.req.path === "/api/health" || c.req.method === "OPTIONS") return next();
+  const budget = await databaseBudget(c.env.DB);
+  c.env = { ...c.env, DB: budget.DB };
+  try {
+    await next();
+  } finally {
+    await budget.finish();
+  }
+});
 app.use("/api/*", async (c, next) => {
   if (
     c.req.method !== "GET" &&
@@ -633,7 +650,7 @@ async function statusHandler(c: AppContext, slug: string) {
   const snapshot = await publicSnapshot(c.env, slug);
   if (!snapshot) return fail("NOT_FOUND", "Status page not found", 404);
   const response = c.json(ok(snapshot), 200, {
-    "cache-control": "public, max-age=30",
+    "cache-control": "public, max-age=120",
     etag: `"${await sha256Hex(JSON.stringify(snapshot))}"`,
   });
   if (cache) await cache.put(cacheKey, response.clone());
@@ -643,10 +660,13 @@ async function statusHandler(c: AppContext, slug: string) {
 app.get("/api/status", (c) => statusHandler(c, "legacy"));
 app.get("/api/status/:slug", (c) => statusHandler(c, c.req.param("slug")));
 app.get("/api/status/:slug/incidents", async (c) => {
-  const snapshot = await publicSnapshot(c.env, c.req.param("slug"));
-  if (!snapshot) return fail("NOT_FOUND", "Status page not found", 404);
-  return c.json(ok(snapshot.activeIncidents), 200, {
-    "cache-control": "public, max-age=30",
+  const response = await statusHandler(c, c.req.param("slug"));
+  if (!response.ok) return response;
+  const snapshot = (await response.json()) as {
+    data: { activeIncidents: unknown[] };
+  };
+  return c.json(ok(snapshot.data.activeIncidents), 200, {
+    "cache-control": "public, max-age=120",
   });
 });
 app.get("/api/status/:slug/history", async (c) => {
@@ -778,11 +798,26 @@ app.get("/api/monitors", async (c) => {
   if (!hasScope(c, "monitors:read"))
     return fail("FORBIDDEN", "API key lacks monitors:read scope", 403);
   const rows = await c.env.DB.prepare(
-    `SELECT * FROM monitors WHERE workspace_id = ? ORDER BY created_at DESC`,
+    `SELECT m.*,latest.latency_ms AS latest_latency_ms,${recentMetricsSql} AS metrics FROM monitors m
+     LEFT JOIN checks latest ON latest.id=m.last_check_id AND latest.workspace_id=m.workspace_id
+     WHERE m.workspace_id = ? ORDER BY m.created_at DESC`,
   )
     .bind(c.get("auth").workspaceId)
     .all<DbRow>();
-  return c.json(ok((rows.results ?? []).map(mapMonitor)));
+  return c.json(
+    ok(
+      (rows.results ?? []).map((row) => ({
+        ...mapMonitor(row),
+        uptime24h: recentMetrics(row).count
+          ? Math.round(
+              (recentMetrics(row).success / recentMetrics(row).count) * 10000,
+            ) / 100
+          : null,
+        latestLatencyMs:
+          row.latest_latency_ms == null ? null : Number(row.latest_latency_ms),
+      })),
+    ),
+  );
 });
 
 app.post("/api/monitors", async (c) => {
@@ -883,6 +918,7 @@ app.post("/api/monitors", async (c) => {
       { "cache-control": "no-store" },
     );
   } catch (error) {
+    if (isDatabaseLimit(error)) throw error;
     return fail(
       "VALIDATION_ERROR",
       error instanceof z.ZodError
@@ -995,6 +1031,7 @@ app.patch("/api/monitors/:id", async (c) => {
     await sendCoordinator(c, c.req.param("id"), "/sync");
     return c.json(ok(mapMonitor(row ?? existing)));
   } catch (error) {
+    if (isDatabaseLimit(error)) throw error;
     return fail(
       "VALIDATION_ERROR",
       error instanceof z.ZodError
@@ -1129,7 +1166,7 @@ app.get("/api/monitors/:id/checks", async (c) => {
     Object.fromEntries(new URL(c.req.url).searchParams),
   );
   const rows = await c.env.DB.prepare(
-    `SELECT * FROM checks WHERE workspace_id = ? AND monitor_id = ? AND julianday(checked_at)>=julianday('now')-COALESCE((SELECT raw_retention_days FROM workspace_entitlements WHERE workspace_id=?),7) ORDER BY checked_at DESC, id DESC LIMIT ? OFFSET ?`,
+    `SELECT * FROM checks WHERE workspace_id = ? AND monitor_id = ? AND checked_at>=strftime('%Y-%m-%dT%H:%M:%SZ','now','-' || COALESCE((SELECT raw_retention_days FROM workspace_entitlements WHERE workspace_id=?),7) || ' days') ORDER BY checked_at DESC, id DESC LIMIT ? OFFSET ?`,
   )
     .bind(
       c.get("auth").workspaceId,
@@ -1156,23 +1193,18 @@ app.get("/api/monitors/:id/stats", async (c) => {
     retention?.raw_retention_days ?? 7,
   );
   const raw = await c.env.DB.prepare(
-    `SELECT ok, latency_ms FROM checks WHERE workspace_id = ? AND monitor_id = ? AND julianday(checked_at) >= julianday('now', ?)`,
+    `SELECT COUNT(*) AS count,COALESCE(SUM(ok),0) AS success,COALESCE(AVG(latency_ms),0) AS latency FROM checks WHERE workspace_id = ? AND monitor_id = ? AND checked_at >= strftime('%Y-%m-%dT%H:%M:%SZ','now', ?)`,
   )
     .bind(c.get("auth").workspaceId, c.req.param("id"), `-${days} days`)
-    .all<{ ok: number; latency_ms: number }>();
-  const rows = raw.results ?? [];
+    .first<{ count: number; success: number; latency: number }>();
   return c.json(
     ok({
       days,
-      checks: rows.length,
-      uptime: rows.length
-        ? uptimePercent(rows.map((row) => ({ ok: row.ok === 1 })))
+      checks: raw?.count ?? 0,
+      uptime: raw?.count
+        ? Math.round((raw.success / raw.count) * 10000) / 100
         : null,
-      avgLatencyMs: rows.length
-        ? Math.round(
-            rows.reduce((sum, row) => sum + row.latency_ms, 0) / rows.length,
-          )
-        : 0,
+      avgLatencyMs: Math.round(raw?.latency ?? 0),
     }),
   );
 });
@@ -1945,22 +1977,22 @@ app.get("/api/stats", async (c) => {
       .bind(workspaceId)
       .first<{ count: number }>(),
     c.env.DB.prepare(
-      `SELECT ok, latency_ms FROM checks WHERE workspace_id = ? AND julianday(checked_at) >= julianday('now', '-1 day')`,
+      `SELECT ${recentMetricsSql} AS metrics FROM monitors m WHERE m.workspace_id=?`,
     )
       .bind(workspaceId)
-      .all<{ ok: number; latency_ms: number }>(),
+      .all<DbRow>(),
   ]);
-  const rows = checks.results ?? [];
+  const metrics = (checks.results ?? []).map(recentMetrics);
+  const total = metrics.reduce((n, m) => n + m.count, 0);
+  const successes = metrics.reduce((n, m) => n + m.success, 0);
   return c.json(
     ok({
       activeMonitors: monitors?.count ?? 0,
       openIncidents: incidents?.count ?? 0,
-      uptime24h: rows.length
-        ? uptimePercent(rows.map((row) => ({ ok: row.ok === 1 })))
-        : null,
-      avgLatency24h: rows.length
+      uptime24h: total ? Math.round((successes / total) * 10000) / 100 : null,
+      avgLatency24h: total
         ? Math.round(
-            rows.reduce((sum, row) => sum + row.latency_ms, 0) / rows.length,
+            metrics.reduce((n, m) => n + m.latency * m.count, 0) / total,
           )
         : 0,
     }),
@@ -1983,7 +2015,7 @@ app.get("/api/internal/ops", async (c) => {
         `SELECT COUNT(*) AS count FROM monitors WHERE active = 1`,
       ).first<{ count: number }>(),
       c.env.DB.prepare(
-        `SELECT COUNT(*) AS count FROM checks WHERE checked_at >= datetime('now','start of day')`,
+        `SELECT COALESCE(SUM((SELECT COUNT(*) FROM checks c WHERE c.workspace_id=m.workspace_id AND c.monitor_id=m.id AND c.checked_at>=strftime('%Y-%m-%dT00:00:00Z','now'))),0) AS count FROM monitors m`,
       ).first<{ count: number }>(),
       c.env.DB.prepare(
         `SELECT COUNT(*) AS count FROM incidents WHERE started_at >= datetime('now','start of day')`,
@@ -2020,6 +2052,29 @@ app.get("/api/settings", async (c) => {
 
 app.notFound(() => fail("NOT_FOUND", "Route not found", 404));
 app.onError((error, c) => {
+  if (isDatabaseLimit(error)) {
+    const midnight = new Date();
+    midnight.setUTCHours(24, 0, 0, 0);
+    return Response.json(
+      {
+        ok: false,
+        error: {
+          code: "DAILY_BUDGET_REACHED",
+          message:
+            "Monitoring is temporarily paused to protect the free daily database allowance. Please retry after midnight UTC.",
+        },
+      },
+      {
+        status: 503,
+        headers: {
+          "cache-control": "no-store",
+          "retry-after": String(
+            Math.max(1, Math.ceil((midnight.getTime() - Date.now()) / 1000)),
+          ),
+        },
+      },
+    );
+  }
   if (error.message.includes("QUOTA_EXCEEDED"))
     return fail("QUOTA_EXCEEDED", "Workspace quota reached", 429);
   if (error.message.includes("CAPACITY_REACHED"))

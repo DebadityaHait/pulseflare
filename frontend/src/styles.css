@@ -3720,6 +3720,17 @@ meter::-moz-meter-bar {
 .pulse-org-trigger {
   max-width: 180px;
 }
+.workspace-switcher .cl-organizationSwitcherTrigger,
+.workspace-switcher .cl-organizationPreviewMainIdentifier {
+  color: var(--text);
+}
+.workspace-switcher .cl-organizationSwitcherTrigger {
+  max-width: 100%;
+  padding: 0;
+}
+.monitor-row > .badge {
+  justify-self: start;
+}
 .auth-page main .cl-rootBox {
   max-width: 100%;
 }

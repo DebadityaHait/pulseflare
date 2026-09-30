@@ -9,7 +9,7 @@ let env: Env;
 const send = vi.fn();
 beforeEach(() => {
   db = new DatabaseSync(":memory:");
-  for (const file of ["0001_schema.sql", "0002_v2.sql", "0003_mvp.sql"])
+  for (const file of ["0001_schema.sql", "0002_v2.sql", "0003_mvp.sql", "0004_free_tier_budget.sql"])
     db.exec(
       readFileSync(new URL(`../migrations/${file}`, import.meta.url), "utf8"),
     );

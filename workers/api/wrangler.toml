@@ -1,20 +1,17 @@
 name = "pulseflare-api"
+account_id = "f456997005771d4af03fa8f845a54f62"
 main = "src/index.ts"
 compatibility_date = "2026-05-06"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "pulseflare"
-database_id = "8c45da35-ca25-449d-b336-3fe2f96efb49"
+database_id = "3136547a-66dd-484b-b931-06f04564f635"
 migrations_dir = "../../migrations"
 
-[[kv_namespaces]]
-binding = "STATUS_KV"
-id = "b5a81e5554bd4386b77f018c6d34a972"
-
 [vars]
-ALLOWED_ORIGIN = "https://pulseflare.pages.dev"
-CLERK_AUTHORIZED_PARTIES = "https://pulseflare.pages.dev,http://localhost:5173,http://localhost:4173"
+ALLOWED_ORIGIN = "https://pulseflare.zlv.uk,https://pulseflare-zlv.pages.dev"
+CLERK_AUTHORIZED_PARTIES = "https://pulseflare.zlv.uk,https://pulseflare-zlv.pages.dev,http://localhost:5173,http://localhost:4173"
 
 [[ratelimits]]
 name = "RATE_LIMITER"
@@ -28,7 +25,3 @@ queue = "alert-events"
 [[queues.producers]]
 binding = "INCIDENT_QUEUE"
 queue = "incident-events"
-
-[[r2_buckets]]
-binding = "ARCHIVE_BUCKET"
-bucket_name = "pulseflare-archive"

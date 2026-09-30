@@ -21,7 +21,7 @@ let db: DatabaseSync;
 let env: Env;
 beforeEach(() => {
   db = new DatabaseSync(":memory:");
-  for (const file of ["0001_schema.sql", "0002_v2.sql", "0003_mvp.sql"])
+  for (const file of ["0001_schema.sql", "0002_v2.sql", "0003_mvp.sql", "0004_free_tier_budget.sql"])
     db.exec(
       readFileSync(new URL(`../migrations/${file}`, import.meta.url), "utf8"),
     );
@@ -155,6 +155,19 @@ describe("heartbeat lifecycle", () => {
   });
 });
 describe("HTTP execution and reliability", () => {
+  it("exposes observed table metrics and leaves unchecked monitors empty", async () => {
+    const m = await http();
+    const empty = (await (await request("/api/monitors")).json()).data[0];
+    expect(empty).toMatchObject({ uptime24h: null, latestLatencyMs: null });
+    await runHttpMonitor(env, m.id, "legacy", true);
+    const observed = (await (await request("/api/monitors")).json()).data[0];
+    expect(observed.uptime24h).toBe(100);
+    expect(observed.latestLatencyMs).toBeTypeOf("number");
+    db.prepare("UPDATE checks SET checked_at='2020-01-01T00:00:00Z'").run();
+    expect(
+      (await (await request("/api/monitors")).json()).data[0].uptime24h,
+    ).toBeNull();
+  });
   it("hides expired raw evidence and deletes it without losing incident lifecycle", async () => {
     const m = await http();
     await request(`/api/monitors/${m.id}/pause`, "POST");

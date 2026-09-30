@@ -96,7 +96,7 @@ function Integrations() {
               notice(
                 "Integration setup",
                 demo
-                  ? "This is a read-only preview. Integration creation will be available with beta enrollment."
+                  ? "This is a read-only preview. Sign up to connect integrations in your own workspace."
                   : "Use the workspace API to configure encrypted integrations. The setup wizard is coming soon.",
               )
             }
@@ -772,6 +772,8 @@ type ApiMonitor = {
   intervalS: number;
   tags?: string[];
   timeoutMs: number;
+  uptime24h?: number | null;
+  latestLatencyMs?: number | null;
 };
 const apiDemoMonitors: ApiMonitor[] = demoMonitors.map((m) => ({
   ...m,
@@ -795,8 +797,11 @@ function useMonitors() {
           active: m.active,
           intervalS: m.intervalS,
           tag: m.tags?.[0] || "default",
-          uptime: 0,
-          latency: 0,
+          uptime: m.uptime24h ?? 0,
+          latency: m.latestLatencyMs ?? 0,
+          uptimeKnown: m.uptime24h !== null && m.uptime24h !== undefined,
+          latencyKnown:
+            m.latestLatencyMs !== null && m.latestLatencyMs !== undefined,
         })),
   };
 }
@@ -1506,7 +1511,7 @@ function NewMonitor() {
     if (demo)
       return notice(
         "Ready for your own monitors?",
-        "This demo is read-only. Public workspace enrollment is coming soon. Your form has not been submitted.",
+        "This demo is read-only. Sign up to create monitors in your own workspace. Your form has not been submitted.",
       );
     const f = new FormData(e.currentTarget);
     setBusy(true);
@@ -1563,8 +1568,9 @@ function NewMonitor() {
         {type === "heartbeat" ? (
           <>
             <p>
-              Heartbeat scheduling is coming in the v2 engine. Explore the
-              example backup monitor to see the product experience.
+              Heartbeats are available in your own workspace. This preview is
+              read-only; explore the example backup monitor to see how they
+              work.
             </p>
             <Link className="button secondary" to="/demo/monitors/backup">
               View sample heartbeat <ArrowRight size={15} />

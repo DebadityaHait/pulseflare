@@ -42,7 +42,9 @@ export function MonitorTable({
   preview = false,
   sample = true,
 }: {
-  monitors?: MonitorView[];
+  monitors?: Array<
+    MonitorView & { uptimeKnown?: boolean; latencyKnown?: boolean }
+  >;
   base?: string;
   preview?: boolean;
   sample?: boolean;
@@ -85,7 +87,7 @@ export function MonitorTable({
             <Badge state={m.state} />
           )}
           <span className="mono">
-            {sample ? `${m.uptime.toFixed(2)}%` : "—"}
+            {sample || m.uptimeKnown ? `${m.uptime.toFixed(2)}%` : "—"}
           </span>
           <span
             className={`mono ${m.state === "degraded" ? "text-warning" : ""}`}
@@ -94,7 +96,7 @@ export function MonitorTable({
               ? m.state === "up"
                 ? "On time"
                 : "Awaiting"
-              : m.latency
+              : m.latencyKnown || m.latency
                 ? `${m.latency} ms`
                 : "—"}
           </span>

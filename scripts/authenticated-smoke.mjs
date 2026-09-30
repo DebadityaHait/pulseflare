@@ -1,7 +1,7 @@
 import { chromium, expect } from "@playwright/test";
 import { clerkSetup, setupClerkTestingToken } from "@clerk/testing/playwright";
 import { randomBytes } from "node:crypto";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 process.loadEnvFile(".env");
 const origin = process.argv[2] || "http://localhost:5173";
 const authOnly = process.argv.includes("--auth-only");
@@ -18,7 +18,14 @@ const context = await browser.newContext();
 await setupClerkTestingToken({ context });
 const page = await context.newPage();
 page.setDefaultTimeout(20000);
-let userId, orgId, heartbeatUrl, monitorId, heartbeatId, keyId, statusId;
+let userId,
+  orgId,
+  workspaceId,
+  heartbeatUrl,
+  monitorId,
+  heartbeatId,
+  keyId,
+  statusId;
 const checks = [];
 async function backend(path, method = "GET", body) {
   const response = await fetch(`https://api.clerk.com/v1${path}`, {
@@ -61,23 +68,29 @@ async function api(path, method = "GET", body) {
 try {
   await page.goto(`${origin}/signup`);
   await page.getByRole("button", { name: /Google/ }).waitFor();
-  await page.getByRole('button',{name:/Google/}).click();
-  await page.waitForURL(url=>url.hostname==='accounts.google.com',{timeout:30000});
+  await page.getByRole("button", { name: /Google/ }).click();
+  await page.waitForURL((url) => url.hostname === "accounts.google.com", {
+    timeout: 30000,
+  });
   checks.push("Google OAuth handoff");
   await page.goto(`${origin}/signup`);
   await page.getByLabel("Email address", { exact: true }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.waitForFunction(
-    () =>
-      window.Clerk?.user ||
-      document.body.innerText.includes("Verify your email"),
-    null,
-    { timeout: 30000 },
-  );
-  if (!(await page.evaluate(() => !!window.Clerk.user))) {
-    await page.locator("input").first().click();
-    await page.keyboard.type("424242");
+  const verifying = page.getByRole("heading", {
+    name: "Verify your email",
+    exact: true,
+  });
+  await Promise.race([
+    verifying.waitFor(),
+    page.getByLabel("Name", { exact: true }).waitFor(),
+  ]);
+  if (await verifying.isVisible()) {
+    // Fill atomically: typing six keys can race Clerk's OTP re-render.
+    await page
+      .locator('input[autocomplete="one-time-code"]')
+      .first()
+      .fill("424242");
     if (
       await page
         .getByRole("button", { name: "Continue", exact: true })
@@ -85,10 +98,7 @@ try {
     )
       await page.getByRole("button", { name: "Continue", exact: true }).click();
   }
-  await page.waitForFunction(() => window.Clerk?.user, null, {
-    timeout: 45000,
-  });
-  userId = await page.evaluate(() => window.Clerk.user.id);
+  await page.getByLabel("Name", { exact: true }).waitFor();
   checks.push("Email/password signup and email verification");
   await page.getByLabel("Name", { exact: true }).fill(`Pulseflare test ${tag}`);
   await page
@@ -98,6 +108,7 @@ try {
     timeout: 30000,
   });
   orgId = await page.evaluate(() => window.Clerk.organization.id);
+  userId = await page.evaluate(() => window.Clerk.user.id);
   checks.push("Organization creation");
   if (!authOnly) {
     await page.waitForURL("**/dashboard");
@@ -105,6 +116,7 @@ try {
       page.getByRole("heading", { name: "Overview", exact: true }),
     ).toBeVisible();
     const workspace = await api("/api/workspace");
+    workspaceId = workspace.workspace.id;
     if (workspace.role !== "admin")
       throw new Error("New organization is not admin");
     checks.push("Authenticated Clerk organization API");
@@ -121,7 +133,11 @@ try {
     await page
       .getByRole("button", { name: "Create monitor", exact: true })
       .click();
-    await page.waitForURL(/\/dashboard\/monitors\/[^/]+$/);
+    await page.waitForURL(
+      (url) =>
+        /^\/dashboard\/monitors\/[^/]+$/.test(url.pathname) &&
+        !url.pathname.endsWith("/new"),
+    );
     monitorId = new URL(page.url()).pathname.split("/").at(-1);
     await page.getByRole("button", { name: "Run check", exact: true }).click();
     await expect(
@@ -159,7 +175,7 @@ try {
       .getByRole("button", { name: "Save status page", exact: true })
       .click();
     await page
-      .getByText("Saved. Public changes appear within 30 seconds.")
+      .getByText("Saved. Public changes appear within two minutes.")
       .waitFor();
     statusId = (await api("/api/status-pages"))[0].id;
     const snapshot = await (
@@ -195,7 +211,33 @@ try {
     )
       throw new Error("Revoked key was accepted");
     checks.push("Scoped API key and revocation");
+    await expect
+      .poll(async () => (await api(`/api/monitors/${heartbeatId}`)).lastState, {
+        timeout: 150000,
+        intervals: [10000],
+      })
+      .toBe("down");
+    const missed = await api(`/api/monitors/${heartbeatId}/incidents`);
+    if (!missed.some((i) => i.status !== "resolved"))
+      throw new Error("Missed heartbeat did not open an incident");
+    if (!(await fetch(heartbeatUrl, { method: "POST" })).ok)
+      throw new Error("Heartbeat recovery ping failed");
+    const recovered = await api(`/api/monitors/${heartbeatId}/incidents`);
+    if (recovered.some((i) => i.status !== "resolved"))
+      throw new Error("Heartbeat did not resolve its incident");
+    checks.push("Scheduled missed-heartbeat incident and automatic recovery");
     await page.goto(`${origin}/dashboard`);
+    await expect(
+      page.getByRole("heading", { name: "Overview", exact: true }),
+    ).toBeVisible();
+    await page.locator(".workspace-shell").waitFor();
+    await expect(page.locator(".skeleton-group")).toHaveCount(0);
+    await expect(
+      page.getByText("Release test website", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Release test backup", { exact: true }),
+    ).toBeVisible();
     await page.screenshot({
       path: "artifacts/authenticated-workspace.png",
       fullPage: true,
@@ -216,6 +258,10 @@ try {
   );
   throw error;
 } finally {
+  await writeFile(
+    "artifacts/authenticated-test.json",
+    JSON.stringify({ workspaceId, orgId, userId, checks, origin }),
+  );
   if (!userId) {
     const users = await backend(
       `/users?email_address=${encodeURIComponent(email)}`,

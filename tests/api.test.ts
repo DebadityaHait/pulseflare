@@ -54,6 +54,7 @@ beforeEach(() => {
     "INSERT INTO workspaces(id,clerk_org_id,name,slug) VALUES ('other','org_other','Other','other'); INSERT INTO workspace_entitlements(workspace_id) VALUES ('other'); INSERT INTO monitors(id,workspace_id,name,url,public) VALUES ('private','other','Private endpoint','https://private.example.com',0),('visible','other','Public endpoint','https://example.com',1); INSERT INTO status_pages(workspace_id,slug,title) VALUES ('other','other','Other status')",
   );
   db.exec(readFileSync(new URL('../migrations/0003_mvp.sql',import.meta.url),'utf8'));
+  db.exec(readFileSync(new URL('../migrations/0004_free_tier_budget.sql',import.meta.url),'utf8'));
   db.exec("INSERT INTO status_components(id,workspace_id,status_page_id,name) SELECT 'other-services','other',id,'Services' FROM status_pages WHERE slug='other'; INSERT INTO status_component_monitors(workspace_id,component_id,monitor_id) VALUES('other','other-services','visible')");
   env = { DB: d1(db), DEV_AUTH_BYPASS: "true" };
 });

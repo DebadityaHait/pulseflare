@@ -1291,7 +1291,7 @@ export function LiveStatusBuilder() {
           </fieldset>
           {saved && (
             <p className="text-good" role="status">
-              Saved. Public changes appear within 30 seconds.
+              Saved. Public changes appear within two minutes.
             </p>
           )}
           {!admin && (

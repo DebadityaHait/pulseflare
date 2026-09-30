@@ -1,4 +1,5 @@
 name = "pulseflare-checker"
+account_id = "f456997005771d4af03fa8f845a54f62"
 main = "src/index.ts"
 compatibility_date = "2026-05-06"
 
@@ -8,11 +9,7 @@ crons = ["*/1 * * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "pulseflare"
-database_id = "8c45da35-ca25-449d-b336-3fe2f96efb49"
-
-[[kv_namespaces]]
-binding = "STATUS_KV"
-id = "b5a81e5554bd4386b77f018c6d34a972"
+database_id = "3136547a-66dd-484b-b931-06f04564f635"
 
 [[queues.producers]]
 binding = "INCIDENT_QUEUE"

@@ -1,8 +1,21 @@
-export type MonitorState = "unknown" | "up" | "pending_down" | "down" | "degraded" | "paused" | "maintenance";
+export type MonitorState =
+  | "unknown"
+  | "up"
+  | "pending_down"
+  | "down"
+  | "degraded"
+  | "paused"
+  | "maintenance";
 export type HttpMethod = "GET" | "HEAD" | "POST";
 export type MonitorType = "http" | "heartbeat";
 export type AiStatus = "pending" | "complete" | "failed" | "fallback";
-export type IncidentStatus = "open" | "acknowledged" | "investigating" | "identified" | "monitoring" | "resolved";
+export type IncidentStatus =
+  | "open"
+  | "acknowledged"
+  | "investigating"
+  | "identified"
+  | "monitoring"
+  | "resolved";
 
 export interface Monitor {
   id: string;
@@ -27,6 +40,8 @@ export interface Monitor {
   secretConfigured?: boolean;
   lastCheckedAt?: string | null;
   lastState?: MonitorState;
+  uptime24h?: number | null;
+  latestLatencyMs?: number | null;
   active: boolean;
   public: boolean;
   tags: string[];
@@ -102,15 +117,45 @@ export interface LatestStatus {
 }
 
 export type IncidentQueueEvent =
-  | { eventId: string; workspaceId: string; type: "incident.opened" | "incident.created"; monitorId: string; incidentId: string; checkId: number; createdAt: string }
-  | { eventId: string; workspaceId: string; type: "incident.resolved"; monitorId: string; incidentId: string; checkId: number; createdAt: string }
-  | { eventId: string; workspaceId: string; type: "anomaly.detected"; monitorId: string; anomalyId: string; checkId: number; createdAt: string };
+  | {
+      eventId: string;
+      workspaceId: string;
+      type: "incident.opened" | "incident.created";
+      monitorId: string;
+      incidentId: string;
+      checkId: number;
+      createdAt: string;
+    }
+  | {
+      eventId: string;
+      workspaceId: string;
+      type: "incident.resolved";
+      monitorId: string;
+      incidentId: string;
+      checkId: number;
+      createdAt: string;
+    }
+  | {
+      eventId: string;
+      workspaceId: string;
+      type: "anomaly.detected";
+      monitorId: string;
+      anomalyId: string;
+      checkId: number;
+      createdAt: string;
+    };
 
 export type AlertQueueEvent = {
   eventId: string;
   type: "notification.route" | "alert.route";
   workspaceId: string;
-  eventType?: "incident.opened" | "incident.resolved" | "heartbeat.missed" | "maintenance.started" | "maintenance.completed" | "degraded";
+  eventType?:
+    | "incident.opened"
+    | "incident.resolved"
+    | "heartbeat.missed"
+    | "maintenance.started"
+    | "maintenance.completed"
+    | "degraded";
   monitorId: string;
   incidentId?: string;
   anomalyId?: string;
@@ -177,4 +222,6 @@ export interface StatusPage {
   updatedAt: string;
 }
 
-export type ApiEnvelope<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
+export type ApiEnvelope<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: { code: string; message: string } };

@@ -156,7 +156,7 @@ export function incidentOutbox(
 
 export async function flushOutbox(env: MonitoringEnv) {
   const rows = await env.DB.prepare(
-    "SELECT * FROM event_outbox WHERE alert_sent=0 OR ai_sent=0 ORDER BY alert_sent,created_at LIMIT 50",
+    "SELECT * FROM event_outbox WHERE event_id IN (SELECT event_id FROM event_outbox WHERE alert_sent=0 UNION SELECT event_id FROM event_outbox WHERE ai_sent=0) ORDER BY alert_sent,created_at LIMIT 50",
   ).all<Row>();
   for (const row of rows.results ?? []) {
     const event = JSON.parse(row.payload) as IncidentQueueEvent;
@@ -222,13 +222,16 @@ export async function runHttpMonitor(
   const result = await probeHttp(row, env.SECRET_ENCRYPTION_KEY);
   const now = new Date().toISOString();
   const previous = await env.DB.prepare(
-    "SELECT latency_ms FROM checks WHERE monitor_id=? AND workspace_id=? AND ok=1 ORDER BY id DESC LIMIT 20",
+    "SELECT ok,latency_ms FROM checks WHERE monitor_id=? AND workspace_id=? ORDER BY checked_at DESC,id DESC LIMIT 20",
   )
     .bind(id, workspaceId)
-    .all<{ latency_ms: number }>();
+    .all<{ ok: number; latency_ms: number }>();
   const anomaly = result.ok
     ? detectLatencyAnomaly(
-        (previous.results ?? []).map((x) => x.latency_ms).reverse(),
+        (previous.results ?? [])
+          .filter((x) => x.ok === 1)
+          .map((x) => x.latency_ms)
+          .reverse(),
         result.latencyMs,
       )
     : { anomalous: false };
@@ -246,7 +249,7 @@ export async function runHttpMonitor(
       ? "down"
       : "pending_down";
   const guard = `SELECT id FROM monitors WHERE id=? AND workspace_id=? AND active=1 AND check_lease_token=?`;
-  const lastCheck = `(SELECT MAX(id) FROM checks WHERE monitor_id=? AND workspace_id=?)`;
+  const lastCheck = `(SELECT id FROM checks WHERE monitor_id=? AND workspace_id=? ORDER BY checked_at DESC,id DESC LIMIT 1)`;
   const statements = [
     env.DB.prepare(
       `INSERT INTO checks(workspace_id,monitor_id,status,ok,latency_ms,error_code,error_msg,response_size_bytes,state,confirmation,checked_at)
@@ -327,11 +330,11 @@ export async function recordHeartbeat(env: MonitoringEnv, secretHash: string) {
       `INSERT INTO checks(workspace_id,monitor_id,status,ok,latency_ms,state,checked_at) SELECT workspace_id,id,200,1,0,'up',? FROM monitors WHERE id IN (${guard})`,
     ).bind(now, secretHash),
     env.DB.prepare(
-      `UPDATE incidents SET status='resolved',resolved_at=?,updated_at=?,recovery_check_id=(SELECT MAX(id) FROM checks WHERE monitor_id=incidents.monitor_id AND workspace_id=incidents.workspace_id) WHERE monitor_id IN (${guard}) AND workspace_id=? AND status<>'resolved'`,
+      `UPDATE incidents SET status='resolved',resolved_at=?,updated_at=?,recovery_check_id=(SELECT id FROM checks WHERE monitor_id=incidents.monitor_id AND workspace_id=incidents.workspace_id ORDER BY checked_at DESC,id DESC LIMIT 1) WHERE monitor_id IN (${guard}) AND workspace_id=? AND status<>'resolved'`,
     ).bind(now, now, secretHash, row.workspace_id),
     incidentOutbox(env.DB, row.id, row.workspace_id, "resolved", now),
     env.DB.prepare(
-      `UPDATE monitors SET heartbeat_last_at=?,heartbeat_deadline_at=strftime('%Y-%m-%dT%H:%M:%SZ',?,'+' || (heartbeat_expected_s+COALESCE(heartbeat_grace_s,0)) || ' seconds'),last_checked_at=?,last_state='up',consecutive_failures=0,last_check_id=(SELECT MAX(id) FROM checks WHERE monitor_id=monitors.id AND workspace_id=monitors.workspace_id) WHERE id IN (${guard}) RETURNING id`,
+      `UPDATE monitors SET heartbeat_last_at=?,heartbeat_deadline_at=strftime('%Y-%m-%dT%H:%M:%SZ',?,'+' || (heartbeat_expected_s+COALESCE(heartbeat_grace_s,0)) || ' seconds'),last_checked_at=?,last_state='up',consecutive_failures=0,last_check_id=(SELECT id FROM checks WHERE monitor_id=monitors.id AND workspace_id=monitors.workspace_id ORDER BY checked_at DESC,id DESC LIMIT 1) WHERE id IN (${guard}) RETURNING id`,
     ).bind(now, now, now, secretHash),
   ]);
   return results[3].results?.length
@@ -348,7 +351,7 @@ export async function checkHeartbeatDeadlines(env: MonitoringEnv) {
     ).bind(now, now),
     env.DB.prepare(
       `INSERT INTO incidents(workspace_id,monitor_id,type,status,started_at,trigger_check_id,failing_error_code)
-      SELECT workspace_id,id,'outage','open',?,(SELECT MAX(id) FROM checks WHERE monitor_id=monitors.id AND workspace_id=monitors.workspace_id),'HEARTBEAT_MISSED' FROM monitors WHERE ${expired} AND NOT EXISTS(SELECT 1 FROM incidents WHERE monitor_id=monitors.id AND workspace_id=monitors.workspace_id AND status<>'resolved')`,
+      SELECT workspace_id,id,'outage','open',?,(SELECT id FROM checks WHERE monitor_id=monitors.id AND workspace_id=monitors.workspace_id ORDER BY checked_at DESC,id DESC LIMIT 1),'HEARTBEAT_MISSED' FROM monitors WHERE ${expired} AND NOT EXISTS(SELECT 1 FROM incidents WHERE monitor_id=monitors.id AND workspace_id=monitors.workspace_id AND status<>'resolved')`,
     ).bind(now, now),
     env.DB.prepare(
       `INSERT OR IGNORE INTO event_outbox(event_id,workspace_id,payload)
@@ -356,7 +359,7 @@ export async function checkHeartbeatDeadlines(env: MonitoringEnv) {
       FROM incidents i JOIN monitors m ON m.id=i.monitor_id AND m.workspace_id=i.workspace_id WHERE m.monitor_type='heartbeat' AND i.status<>'resolved'`,
     ).bind(now),
     env.DB.prepare(
-      `UPDATE monitors SET last_state='down',last_checked_at=?,last_check_id=(SELECT MAX(id) FROM checks WHERE monitor_id=monitors.id AND workspace_id=monitors.workspace_id) WHERE ${expired}`,
+      `UPDATE monitors SET last_state='down',last_checked_at=?,last_check_id=(SELECT id FROM checks WHERE monitor_id=monitors.id AND workspace_id=monitors.workspace_id ORDER BY checked_at DESC,id DESC LIMIT 1) WHERE ${expired}`,
     ).bind(now, now),
   ]);
 }

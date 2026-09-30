@@ -8,6 +8,9 @@ import {
   fallbackSeverity,
   parseSeverity,
   MAX_AI_EVENTS_PER_WORKSPACE_PER_DAY,
+  databaseBudget,
+  databaseRetryDelay,
+  isDatabaseLimit,
   type AlertQueueEvent,
   type Check,
   type Incident,
@@ -287,20 +290,36 @@ async function handleEvent(env: Env, event: IncidentQueueEvent) {
 
 export default {
   async queue(batch: MessageBatch<IncidentQueueEvent>, env: Env) {
-    for (const message of batch.messages) {
-      try {
-        await handleEvent(env, message.body);
-        message.ack();
-      } catch (error) {
-        console.log(
-          JSON.stringify({
-            level: "error",
-            event: "queue.ai.error",
-            message: error instanceof Error ? error.message : "unknown",
-          }),
-        );
-        message.retry();
+    let budget: Awaited<ReturnType<typeof databaseBudget>>;
+    try {
+      budget = await databaseBudget(env.DB);
+    } catch (error) {
+      if (!isDatabaseLimit(error)) throw error;
+      batch.messages.forEach((message) =>
+        message.retry({ delaySeconds: databaseRetryDelay() }),
+      );
+      return;
+    }
+    try {
+      for (const message of batch.messages) {
+        try {
+          await handleEvent({ ...env, DB: budget.DB }, message.body);
+          message.ack();
+        } catch (error) {
+          console.log(
+            JSON.stringify({
+              level: "error",
+              event: "queue.ai.error",
+              message: error instanceof Error ? error.message : "unknown",
+            }),
+          );
+          message.retry({
+            delaySeconds: isDatabaseLimit(error) ? databaseRetryDelay() : 60,
+          });
+        }
       }
+    } finally {
+      await budget.finish();
     }
   },
 };

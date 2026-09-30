@@ -4,8 +4,11 @@ AI-enhanced uptime monitoring on Cloudflare Workers.
 
 Pulseflare is a serverless monitoring system that checks HTTP services, detects outages and latency anomalies, summarizes incidents with Workers AI, scores severity, and routes alerts through async queues. It is built as a portfolio-grade full-stack project to demonstrate edge compute, durable storage, queues, AI integration, and a polished operational dashboard.
 
-**Live demo:** https://pulseflare.pages.dev  
-**API:** https://pulseflare-api.opener.workers.dev
+**Live app:** https://pulseflare.zlv.uk
+
+**Read-only demo:** https://pulseflare.zlv.uk/demo
+
+**API:** https://pulseflare.zlv.uk/api
 
 ## Functional Beta MVP
 
@@ -20,7 +23,7 @@ Open `http://localhost:5173`. Demo routes require no credentials. Real accounts 
 
 The API uses Clerk organization sessions or scoped API keys. HTTP checks, assertions, encrypted headers, heartbeat deadlines/recovery/rotation, incident updates, encrypted notification integrations, delivery logs, public-page selection, and API keys are connected to real Workers/D1 data. Alerts dispatch independently of optional, quota-limited AI enrichment.
 
-See [MVP runtime and release checks](docs/MVP_RELEASE.md) and the [deferred feature backlog](TODO.md). The frontend remains on `pulseflare.pages.dev`; a Pages service binding proxies `/api/*` to the API Worker. The active scheduler is a minute cron with atomic D1 leases. Durable Objects, archives/rollups, billing, and other advanced additions are deferred.
+See [MVP runtime and release checks](docs/MVP_RELEASE.md), [free-tier safeguards](docs/FREE_TIER_OPERATIONS.md), and the [deferred feature backlog](TODO.md). The frontend uses `pulseflare.zlv.uk` in the second Cloudflare account; a Pages service binding proxies `/api/*` to the API Worker. The active scheduler is a minute cron with atomic D1 leases. Durable Objects, archives/rollups, billing, and other advanced additions are deferred.
 
 ## Why It Matters
 
@@ -37,10 +40,10 @@ The AI layer is intentionally asynchronous and guarded by deterministic fallback
 
 ## Highlights
 
-- **Cloudflare-native architecture:** Workers, Cron Triggers, D1, KV, Queues, R2, Workers AI, and Pages.
+- **Cloudflare-native MVP:** Workers, Cron Triggers, D1, Queues, Workers AI, and Pages. KV snapshots and R2 archival are deferred.
 - **AI incident intelligence:** incident summaries, anomaly explanations, and severity scoring via Workers AI.
 - **Noise-aware alerting:** severity-based routing with Discord, Telegram, and generic webhook support.
-- **Fast public status reads:** selected public monitor state cached for 30 seconds at the edge, evidence stored in D1.
+- **Fast public status reads:** selected public monitor state cached for two minutes at the edge, indexed evidence stored in D1.
 - **Typed full-stack implementation:** strict TypeScript across shared logic, Workers, tests, and React frontend.
 - **Product showcase:** responsive homepage, theme-aware workspace, public demo, incident exports, integrations preview, usage, status pages, and honest coming-soon plans.
 

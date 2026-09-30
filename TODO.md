@@ -11,6 +11,7 @@ they should not be described as available on the marketing site until verified.
 - [ ] Queue dead-letter handling and operator tools. Depends on observability counters and queue permissions. Done when abandoned deliveries can be inspected and safely retried without resending successful channels.
 - [ ] Production Clerk instance and custom domain. Development auth is enabled for this MVP. Done when production keys, Google OAuth credentials, redirects, workspace access, and email flows are verified on the chosen domain.
 - [ ] DNS-aware SSRF protection and abuse/capacity budgeting. Current validation blocks private literals/internal names and disables redirects. Done when DNS rebinding cases are tested and monitoring resource use has measured headroom.
+- [ ] Account-wide quota dashboard/alerts covering D1 REST migrations, Workers requests, Queues and AI. The MVP already has indexed queries and a shared Worker D1 budget guard; external usage and other projects must also be measured before raising capacity.
 
 ## Product improvements
 
@@ -51,3 +52,4 @@ they should not be described as available on the marketing site until verified.
 | One Beta status page | Status page editor | Unique workspace page and quota handling |
 | Pro/Team | Pricing | Coming-soon notice; no payment or subscription mutation |
 | Public demo | `/demo/*`, `/status/demo` | Labeled fictional data, no monitoring mutations |
+- [ ] Clerk organization deletion webhook and tenant teardown. Done when deleting an organization stops its monitors, revokes API keys, applies the retention policy, and retries safely. Until then, operators must clean up deleted workspace resources explicitly.
