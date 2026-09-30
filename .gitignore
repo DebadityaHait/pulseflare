@@ -10,3 +10,18 @@ coverage
 artifacts/
 test-results/
 playwright-report/
+
+# Local planning and development notes
+AGENTS.md
+CLAUDE.md
+PRD.md
+TODO.md
+*prd.md
+*PRD.md
+PULSEFLARE_INTERVIEW_MASTER_GUIDE.md
+.unsnooze/
+docs/MVP_RELEASE.md
+docs/PRESENTATION_RELEASE.md
+docs/FREE_TIER_OPERATIONS.md
+scripts/read-chunk.mjs
+scripts/inspect-ui.mjs
